@@ -1,0 +1,18 @@
+# Private authoring state: operation keys, raw responses, credentials, and originals.
+.work/
+.env
+.env.*
+!.env.example
+
+# Local tooling and editor state.
+.DS_Store
+Thumbs.db
+*.swp
+
+# Raw or temporary media must never become a public browser asset.
+media/*.original
+media/*.raw
+media/*.tmp
+media/*.tmp-*
+receipts/*.raw.json
+receipts/*.tmp-*

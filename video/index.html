@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A qualitative, capability-aligned comparison of two official video prompts across MiniMax-H3 and grok-imagine-video-1.5.">
+    <meta name="referrer" content="no-referrer">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; connect-src 'none'; font-src 'self'; form-action 'none'; frame-ancestors 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'">
+    <title>Official prompt / video evidence</title>
+    <link rel="stylesheet" href="assets/site.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#comparison">Skip to comparison</a>
+    <header class="site-header">
+      <div class="shell header-grid">
+        <div class="masthead-mark" aria-hidden="true">OP / V</div>
+        <div class="masthead-copy">
+          <p class="eyebrow">Official prompt / video evidence</p>
+          <h1>Same words.<br><span>Different motion.</span></h1>
+          <p class="intro">A small, inspectable record of two official prompts rendered through two distinct video routes.</p>
+        </div>
+        <dl class="header-ledger" aria-label="Repository record">
+          <div><dt>Cells</dt><dd>02 × 02</dd></div>
+          <div><dt>Sampling</dt><dd>1 / route</dd></div>
+          <div><dt>Mode</dt><dd>Qualitative</dd></div>
+        </dl>
+      </div>
+    </header>
+
+    <main id="comparison" class="shell">
+      <section class="notice" aria-labelledby="notice-title">
+        <div class="notice-rule" aria-hidden="true"></div>
+        <div>
+          <h2 id="notice-title">Read the record before reading the result.</h2>
+          <p>All cells are AI-generated. This is one sample per case and route: capability-aligned, not pixel-identical, and not a ranking.</p>
+        </div>
+        <a class="text-link" href="#methodology">Method and rights <span aria-hidden="true">↘</span></a>
+      </section>
+
+      <nav class="case-nav" aria-label="Prompt cases" data-case-tabs>
+        <span class="case-nav-label">Prompt cases</span>
+        <div class="case-nav-links">
+          <a href="#case-minimax-official-01" data-case-tab="case-minimax-official-01" aria-current="true">01 / drone dancer</a>
+          <a href="#case-xai-official-01" data-case-tab="case-xai-official-01">02 / Mars launch</a>
+        </div>
+        <span class="case-nav-note">Both records remain readable without JavaScript.</span>
+      </nav>
+
+      <section class="case-list" aria-label="Official prompt comparisons">
+        <article id="case-minimax-official-01" class="case-panel" data-case-panel="case-minimax-official-01">
+          <header class="case-heading">
+            <div class="case-number" aria-hidden="true">01</div>
+            <div class="case-heading-copy">
+              <p class="eyebrow">MiniMax source case</p>
+              <h2>Drone dancer</h2>
+              <p class="prompt-text"><span class="prompt-label">Exact prompt</span>A tiktok dancer is dancing on a drone, doing flips and tricks.</p>
+              <p class="citation">Source: <cite><a href="https://platform.minimax.io/docs/guides/video-generation" rel="noreferrer">MiniMax video generation guide</a></cite><span class="citation-date">accessed 2026-08-30</span></p>
+            </div>
+            <p class="case-hash">prompt sha256<br><code>b57b8eaa4593…1d1b0</code></p>
+          </header>
+
+          <section class="video-comparison" data-video-comparison aria-label="Drone dancer output comparison">
+            <div class="comparison-toolbar">
+              <div class="toolbar-group toolbar-transport" aria-label="Linked playback controls">
+                <button type="button" class="control control-primary" data-video-action="play">Play both</button>
+                <button type="button" class="control" data-video-action="pause">Pause</button>
+                <button type="button" class="control" data-video-action="restart">Restart</button>
+              </div>
+              <label class="range-wrap">
+                <span class="sr-only">Linked timeline</span>
+                <input type="range" data-video-seek min="0" max="1000" value="0" step="1" aria-label="Linked timeline, 0 percent">
+              </label>
+              <output class="time-readout" data-video-time>0:00 / 0:05</output>
+              <div class="toolbar-group toolbar-options">
+                <label class="check-control"><input type="checkbox" data-video-link checked> <span>Link playback</span></label>
+                <button type="button" class="control" data-video-action="mute" aria-pressed="false">Mute</button>
+              </div>
+            </div>
+            <p class="live-status" data-video-status role="status" aria-live="polite">Ready for admitted media. Native player controls remain available.</p>
+
+            <div class="video-grid">
+              <figure class="video-cell" data-case-id="minimax-official-01" data-route-id="minimax-h3" data-state="generated">
+                <div class="media-frame">
+                  <div class="planned-frame" aria-hidden="true"><span class="frame-index">A</span><span>Admitted output</span><span class="frame-line"></span></div>
+                  <video controls playsinline preload="metadata" poster="media/minimax-official-01--minimax-h3.poster.webp" data-video-player data-provider="MiniMax-H3" aria-label="MiniMax-H3 output for the drone dancer prompt">
+                    <source src="media/minimax-official-01--minimax-h3.mp4" type="video/mp4">
+                    This MiniMax-H3 video is admitted and available with native controls.
+                  </video>
+                </div>
+                <figcaption>
+                  <div class="provider-line"><span class="provider-dot provider-dot-red" aria-hidden="true"></span><strong>MiniMax-H3</strong><span class="state-tag">GENERATED</span></div>
+                  <p>Local SGLang route · 768 px short edge</p>
+                </figcaption>
+                <details class="facts">
+                  <summary>Run facts</summary>
+                  <dl class="facts-list">
+                    <div><dt>Requested</dt><dd>MiniMax-H3</dd></div>
+                    <div><dt>Served identity</dt><dd>Recorded at admission</dd></div>
+                    <div><dt>Route</dt><dd>Local SGLang · loopback</dd></div>
+                    <div><dt>Parameters</dt><dd>5 s · 16:9 · 768 px short edge</dd></div>
+                    <div><dt>Seed</dt><dd>Route does not accept seed</dd></div>
+                    <div><dt>Cost</dt><dd>Local compute not priced</dd></div>
+                  </dl>
+                </details>
+              </figure>
+
+              <figure class="video-cell" data-case-id="minimax-official-01" data-route-id="grok-video" data-state="planned">
+                <div class="media-frame">
+                  <div class="planned-frame" aria-hidden="true"><span class="frame-index">B</span><span>Asset pending admission</span><span class="frame-line"></span></div>
+                  <video controls playsinline preload="metadata" poster="assets/planned-video.webp" data-asset-path="media/minimax-official-01--grok-video.mp4" data-poster-path="media/minimax-official-01--grok-video.poster.webp" data-video-player data-provider="grok-imagine-video-1.5" aria-label="grok-imagine-video-1.5 output for the drone dancer prompt">
+                    This grok-imagine-video-1.5 video is planned and will appear after private review and admission.
+                  </video>
+                </div>
+                <figcaption>
+                  <div class="provider-line"><span class="provider-dot provider-dot-blue" aria-hidden="true"></span><strong>grok-imagine-video-1.5</strong><span class="state-tag">PLANNED</span></div>
+                  <p>Private Sub2API route · provider preset 480p</p>
+                </figcaption>
+                <details class="facts">
+                  <summary>Run facts</summary>
+                  <dl class="facts-list">
+                    <div><dt>Requested</dt><dd>grok-imagine-video-1.5</dd></div>
+                    <div><dt>Served identity</dt><dd>Recorded at admission</dd></div>
+                    <div><dt>Route</dt><dd>Private Sub2API · video generations</dd></div>
+                    <div><dt>Parameters</dt><dd>5 s · 16:9 · provider preset 480p</dd></div>
+                    <div><dt>Seed</dt><dd>Provider-assigned, not exposed</dd></div>
+                    <div><dt>Cost</dt><dd>Paid route amount not exposed</dd></div>
+                  </dl>
+                </details>
+              </figure>
+            </div>
+          </section>
+        </article>
+
+        <article id="case-xai-official-01" class="case-panel" data-case-panel="case-xai-official-01">
+          <header class="case-heading">
+            <div class="case-number" aria-hidden="true">02</div>
+            <div class="case-heading-copy">
+              <p class="eyebrow">xAI source case</p>
+              <h2>Mars launch</h2>
+              <p class="prompt-text"><span class="prompt-label">Exact prompt</span>A glowing crystal-powered rocket launching from the red dunes of Mars, ancient alien ruins lighting up in the background as it soars into a sky full of unfamiliar constellations</p>
+              <p class="citation">Source: <cite><a href="https://docs.x.ai/developers/model-capabilities/video/generation" rel="noreferrer">xAI video generation guide</a></cite><span class="citation-date">accessed 2026-08-30</span></p>
+            </div>
+            <p class="case-hash">prompt sha256<br><code>4581e2710884…f54e67</code></p>
+          </header>
+
+          <section class="video-comparison" data-video-comparison aria-label="Mars launch output comparison">
+            <div class="comparison-toolbar">
+              <div class="toolbar-group toolbar-transport" aria-label="Linked playback controls">
+                <button type="button" class="control control-primary" data-video-action="play">Play both</button>
+                <button type="button" class="control" data-video-action="pause">Pause</button>
+                <button type="button" class="control" data-video-action="restart">Restart</button>
+              </div>
+              <label class="range-wrap">
+                <span class="sr-only">Linked timeline</span>
+                <input type="range" data-video-seek min="0" max="1000" value="0" step="1" aria-label="Linked timeline, 0 percent">
+              </label>
+              <output class="time-readout" data-video-time>0:00 / 0:05</output>
+              <div class="toolbar-group toolbar-options">
+                <label class="check-control"><input type="checkbox" data-video-link checked> <span>Link playback</span></label>
+                <button type="button" class="control" data-video-action="mute" aria-pressed="false">Mute</button>
+              </div>
+            </div>
+            <p class="live-status" data-video-status role="status" aria-live="polite">Ready for admitted media. Native player controls remain available.</p>
+
+            <div class="video-grid">
+              <figure class="video-cell" data-case-id="xai-official-01" data-route-id="minimax-h3" data-state="generated">
+                <div class="media-frame">
+                  <div class="planned-frame" aria-hidden="true"><span class="frame-index">A</span><span>Admitted output</span><span class="frame-line"></span></div>
+                  <video controls playsinline preload="metadata" poster="media/xai-official-01--minimax-h3.poster.webp" data-video-player data-provider="MiniMax-H3" aria-label="MiniMax-H3 output for the Mars launch prompt">
+                    <source src="media/xai-official-01--minimax-h3.mp4" type="video/mp4">
+                    This MiniMax-H3 video is admitted and available with native controls.
+                  </video>
+                </div>
+                <figcaption>
+                  <div class="provider-line"><span class="provider-dot provider-dot-red" aria-hidden="true"></span><strong>MiniMax-H3</strong><span class="state-tag">GENERATED</span></div>
+                  <p>Local SGLang route · 768 px short edge</p>
+                </figcaption>
+                <details class="facts">
+                  <summary>Run facts</summary>
+                  <dl class="facts-list">
+                    <div><dt>Requested</dt><dd>MiniMax-H3</dd></div>
+                    <div><dt>Served identity</dt><dd>Recorded at admission</dd></div>
+                    <div><dt>Route</dt><dd>Local SGLang · loopback</dd></div>
+                    <div><dt>Parameters</dt><dd>5 s · 16:9 · 768 px short edge</dd></div>
+                    <div><dt>Seed</dt><dd>Route does not accept seed</dd></div>
+                    <div><dt>Cost</dt><dd>Local compute not priced</dd></div>
+                  </dl>
+                </details>
+              </figure>
+
+              <figure class="video-cell" data-case-id="xai-official-01" data-route-id="grok-video" data-state="planned">
+                <div class="media-frame">
+                  <div class="planned-frame" aria-hidden="true"><span class="frame-index">B</span><span>Asset pending admission</span><span class="frame-line"></span></div>
+                  <video controls playsinline preload="metadata" poster="assets/planned-video.webp" data-asset-path="media/xai-official-01--grok-video.mp4" data-poster-path="media/xai-official-01--grok-video.poster.webp" data-video-player data-provider="grok-imagine-video-1.5" aria-label="grok-imagine-video-1.5 output for the Mars launch prompt">
+                    This grok-imagine-video-1.5 video is planned and will appear after private review and admission.
+                  </video>
+                </div>
+                <figcaption>
+                  <div class="provider-line"><span class="provider-dot provider-dot-blue" aria-hidden="true"></span><strong>grok-imagine-video-1.5</strong><span class="state-tag">PLANNED</span></div>
+                  <p>Private Sub2API route · provider preset 480p</p>
+                </figcaption>
+                <details class="facts">
+                  <summary>Run facts</summary>
+                  <dl class="facts-list">
+                    <div><dt>Requested</dt><dd>grok-imagine-video-1.5</dd></div>
+                    <div><dt>Served identity</dt><dd>Recorded at admission</dd></div>
+                    <div><dt>Route</dt><dd>Private Sub2API · video generations</dd></div>
+                    <div><dt>Parameters</dt><dd>5 s · 16:9 · provider preset 480p</dd></div>
+                    <div><dt>Seed</dt><dd>Provider-assigned, not exposed</dd></div>
+                    <div><dt>Cost</dt><dd>Paid route amount not exposed</dd></div>
+                  </dl>
+                </details>
+              </figure>
+            </div>
+          </section>
+        </article>
+      </section>
+
+      <section class="methodology" id="methodology" aria-labelledby="methodology-title">
+        <div class="methodology-heading">
+          <p class="eyebrow">Record notes</p>
+          <h2 id="methodology-title">A comparison with its limits attached.</h2>
+        </div>
+        <div class="methodology-grid">
+          <div>
+            <h3>Sampling</h3>
+            <p>Each official prompt is run once through each route. The four cells are qualitative observations, not a benchmark score or a claim about general model quality.</p>
+          </div>
+          <div>
+            <h3>Capability alignment</h3>
+            <p>Both requests use 5 seconds and 16:9. MiniMax-H3 targets a 768 px short edge; the Grok route exposes a 480p preset. Their pixels and serving paths are not identical.</p>
+          </div>
+          <div>
+            <h3>Identity and cost</h3>
+            <p>Requested model names belong to the route. Served identity, seed, and cost are recorded only when the run exposes evidence; otherwise the ledger names the absence.</p>
+          </div>
+          <div>
+            <h3>Publication boundary</h3>
+            <p>Generation state, raw responses, credentials, and originals remain private. Only reviewed, hashed web derivatives and sanitized receipts enter this repository.</p>
+          </div>
+        </div>
+        <p class="availability-note">Current release: both MiniMax-H3 cells are admitted. The requested Grok 1.5 cells remain planned because the available private gateway does not expose that exact model.</p>
+        <p class="methodology-links"><a class="text-link" href="METHODOLOGY.md">Read methodology <span aria-hidden="true">↗</span></a><a class="text-link" href="DATA_NOTICE.md">Read data notice <span aria-hidden="true">↗</span></a><a class="text-link" href="https://github.com/oldwinter/official-prompt-video-gallery" rel="noreferrer">Source repository <span aria-hidden="true">↗</span></a></p>
+      </section>
+    </main>
+
+    <footer class="site-footer shell">
+      <p>Official prompt / video evidence · code licensed under MIT · prompts and generated media excluded from the code license.</p>
+      <p><a href="LICENSE">License</a> <span aria-hidden="true">·</span> <a href="DATA_NOTICE.md">Data notice</a></p>
+    </footer>
+
+    <script type="module" src="assets/video-controls.js"></script>
+  </body>
+</html>
