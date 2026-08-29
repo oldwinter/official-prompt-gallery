@@ -623,7 +623,7 @@ function parseCli(argv) {
   const options = { mode: 'publish', root: REPOSITORY_ROOT };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
-    if (argument === '--mode') options.mode = argv[++index] || '';
+    if (argument === '--mode') options.mode = argv[++index] === 'fixture' ? 'authoring' : (argv[index] || '');
     else if (argument === '--fixture') options.mode = 'authoring';
     else if (argument === '--root') options.root = path.resolve(argv[++index] || '.');
     else if (argument === '--help' || argument === '-h') options.help = true;
