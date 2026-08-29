@@ -8,6 +8,10 @@ function finiteDuration(player) {
   return Number.isFinite(player.duration) && player.duration > 0 ? player.duration : 0;
 }
 
+function isPlayable(player) {
+  return Boolean(player.currentSrc || player.querySelector('source[src]')) && !player.closest('[data-state="planned"]');
+}
+
 function formatTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
   const whole = Math.floor(seconds);
@@ -43,6 +47,7 @@ export function attachVideoComparison(root) {
   if (!root || root.dataset.videoControlsAttached === "true") return null;
 
   const players = [...root.querySelectorAll("[data-video-player]")].slice(0, 2);
+  const playablePlayers = () => players.filter(isPlayable);
   if (players.length === 0) return null;
 
   root.dataset.videoControlsAttached = "true";
@@ -84,7 +89,7 @@ export function attachVideoComparison(root) {
     const master = players[0];
     const masterRatio = getRatio(master);
     if (finiteDuration(master) > 0) {
-      players.slice(1).forEach((player) => {
+      playablePlayers().slice(1).forEach((player) => {
         const duration = finiteDuration(player);
         if (!duration) return;
         const desired = masterRatio * duration;
@@ -123,7 +128,12 @@ export function attachVideoComparison(root) {
 
   const playPlayers = async () => {
     syncing = true;
-    const outcomes = await Promise.allSettled(players.map((player) => player.play()));
+    const playable = playablePlayers();
+    if (!playable.length) {
+      setStatus(status, "No admitted video is available yet.", "error");
+      return false;
+    }
+    const outcomes = await Promise.allSettled(playable.map((player) => player.play()));
     syncing = false;
     const rejected = outcomes.find((outcome) => outcome.status === "rejected");
     if (rejected) {
@@ -131,7 +141,7 @@ export function attachVideoComparison(root) {
       setStatus(status, "Playback could not start; use each native player to inspect its state.", "error");
       return false;
     }
-    setStatus(status, linked ? "Linked playback active." : "Playback active; players are independent.", "active");
+    setStatus(status, playable.length < players.length ? "Playing admitted output; planned cells remain paused." : linked ? "Linked playback active." : "Playback active; players are independent.", "active");
     startFrameLoop();
     return true;
   };
