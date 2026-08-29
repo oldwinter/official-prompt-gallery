@@ -17,6 +17,8 @@ const REPOSITORY_ROOT = path.resolve(fileURLToPath(new URL('../', import.meta.ur
 const PRIVATE_ROOT = path.join(REPOSITORY_ROOT, '.work');
 const OPERATIONS_ROOT = path.join(PRIVATE_ROOT, 'operations');
 const MAX_BYTES = 25 * 1024 * 1024;
+const REQUEST_TIMEOUT_MS = 120_000;
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 const HASH_PATTERN = /^[a-f0-9]{64}$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
@@ -32,10 +34,6 @@ function now() {
 
 function isHash(value) {
   return typeof value === 'string' && HASH_PATTERN.test(value);
-}
-
-function isInstant(value) {
-  return typeof value === 'string' && INSTANT_PATTERN.test(value) && !Number.isNaN(new Date(value).valueOf());
 }
 
 function isDate(value) {
@@ -134,16 +132,31 @@ function statePath(operationDirectoryValue) {
 async function acquireLock(operationDirectoryValue) {
   await fs.mkdir(operationDirectoryValue, { recursive: true, mode: 0o700 });
   const lockPath = path.join(operationDirectoryValue, '.lock');
-  try {
-    const handle = await fs.open(lockPath, 'wx', 0o600);
-    return async function release() {
-      await handle.close().catch(() => {});
-      await fs.rm(lockPath, { force: true }).catch(() => {});
-    };
-  } catch (error) {
-    if (error.code === 'EEXIST') throw new Error('operation is already being handled by another process');
-    throw error;
+  const staleAfter = Math.max(60_000, Number(process.env.CAPTURE_LOCK_STALE_MS || 6 * 60 * 60 * 1000));
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const handle = await fs.open(lockPath, 'wx', 0o600);
+      await handle.writeFile(`${process.pid}\n`, 'utf8');
+      return async function release() {
+        await handle.close().catch(() => {});
+        await fs.rm(lockPath, { force: true }).catch(() => {});
+      };
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      try {
+        const info = await fs.stat(lockPath);
+        if (Date.now() - info.mtimeMs > staleAfter) {
+          await fs.rm(lockPath, { force: true });
+          continue;
+        }
+      } catch (statError) {
+        if (statError.code !== 'ENOENT') throw statError;
+        continue;
+      }
+      throw new Error('operation is already being handled by another process');
+    }
   }
+  throw new Error('could not acquire operation lock');
 }
 
 function publicRequestShape(request) {
@@ -180,16 +193,6 @@ function sanitizedSummary(state) {
     route_id: state.route_id,
     phase: state.phase
   };
-}
-
-async function readOperation(operationKeyValue) {
-  const directory = operationDirectory(operationKeyValue);
-  try {
-    return { directory, state: await readJson(statePath(directory)) };
-  } catch (error) {
-    if (error.code === 'ENOENT') throw new Error(`operation not found: ${operationKeyValue}`);
-    throw error;
-  }
 }
 
 async function writeState(directory, state) {
@@ -248,10 +251,12 @@ export function parseProviderResponse(route, response) {
   const result = data && typeof data === 'object' ? data : response.result && typeof response.result === 'object' ? response.result : response;
   const inline = result && (result.b64_json || result.base64 || result.image_base64 || result.data_url);
   const remoteUrl = result && (result.url || result.image_url || result.output_url);
-  const pending = ['queued', 'pending', 'processing', 'in_progress', 'running'].includes(status) || (!inline && !remoteUrl && (result?.id || response.id) && status !== 'succeeded' && status !== 'completed' && status !== 'success');
-  if (pending) return { kind: 'pending', remote_job_ref: String(result?.id || response.id), status: status || 'pending' };
+  const failed = ['failed', 'error', 'cancelled', 'canceled', 'rejected', 'expired', 'timeout', 'timed_out', 'aborted'].includes(status);
+  if (failed) throw new Error('provider reported a failed image operation');
+  const remoteJobRef = result?.id || response.id;
+  const pending = ['queued', 'pending', 'processing', 'in_progress', 'running'].includes(status) || (!status && remoteJobRef);
+  if (pending && remoteJobRef) return { kind: 'pending', remote_job_ref: String(remoteJobRef), status: status || 'pending' };
   if (!inline && !remoteUrl) {
-    if (status && ['failed', 'error', 'cancelled', 'canceled'].includes(status)) throw new Error('provider reported a failed image operation');
     throw new Error('provider response did not contain image data');
   }
   const bytes = inline ? decodeDataUrl(String(inline)) || Buffer.from(String(inline), 'base64') : null;
@@ -269,12 +274,12 @@ export function parseProviderResponse(route, response) {
 
 function routeRequest(request) {
   const model = request.requested_model.id;
-  const size = request.parameters.requested_size;
   const body = {
     model,
     prompt: request.prompt,
     n: 1,
-    size: `${size.width}x${size.height}`,
+    aspect_ratio: request.parameters.aspect_ratio,
+    resolution: '1k',
     quality: request.parameters.quality.value
   };
   return body;
@@ -289,37 +294,65 @@ function privateCredential(name) {
 function baseUrl(value) {
   let parsed;
   try { parsed = new URL(value); } catch { throw new Error('GROK_BASE_URL must be a valid HTTPS or loopback URL'); }
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error('GROK_BASE_URL must not contain credentials, query, or fragment');
   if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && ['127.0.0.1', 'localhost', '::1'].includes(parsed.hostname))) throw new Error('GROK_BASE_URL must use HTTPS except for loopback development');
   return parsed.toString().replace(/\/$/, '');
 }
 
+function endpoint(base, pathSuffix) {
+  const suffix = pathSuffix.startsWith('/v1/') && base.endsWith('/v1') ? pathSuffix.slice(3) : pathSuffix;
+  return `${base}${suffix}`;
+}
+
+async function readLimited(response, limit = MAX_BYTES) {
+  const declared = Number(response.headers.get('content-length') || 0);
+  if (declared > limit) throw new Error(`provider response exceeds ${limit} bytes`);
+  if (!response.body) return Buffer.alloc(0);
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of response.body) {
+    const bytes = Buffer.from(chunk);
+    total += bytes.length;
+    if (total > limit) throw new Error(`provider response exceeds ${limit} bytes`);
+    chunks.push(bytes);
+  }
+  return Buffer.concat(chunks, total);
+}
+
+async function readJsonResponse(response) {
+  const bytes = await readLimited(response, MAX_BYTES);
+  try { return JSON.parse(bytes.toString('utf8')); } catch { throw new Error(`provider returned HTTP ${response.status} without valid JSON`); }
+}
+
 function createGrokAdapter() {
-  const endpoint = baseUrl(process.env.GROK_BASE_URL || 'http://127.0.0.1:8000');
+  const endpointBase = baseUrl(process.env.GROK_BASE_URL || 'http://127.0.0.1:8000');
   const token = privateCredential('GROK_API_KEY');
   return {
     async submit(request, key) {
-      const response = await fetch(`${endpoint}/v1/images/generations`, {
+      const response = await fetch(endpoint(endpointBase, '/v1/images/generations'), {
         method: 'POST',
         headers: {
           authorization: `Bearer ${token}`,
           'content-type': 'application/json',
           'idempotency-key': key
         },
-        body: JSON.stringify(routeRequest(request))
+        body: JSON.stringify(routeRequest(request)),
+        redirect: 'error',
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
       });
-      let payload;
-      try { payload = await response.json(); } catch { throw new Error(`provider returned HTTP ${response.status} without JSON`); }
+      const payload = await readJsonResponse(response);
       if (!response.ok && response.status !== 202) throw new Error(`provider returned HTTP ${response.status}`);
       const parsed = parseProviderResponse({ id: 'grok-image' }, payload);
       parsed.transport_status = response.status;
       return parsed;
     },
     async poll(remoteJobRef) {
-      const response = await fetch(`${endpoint}/v1/images/generations/${encodeURIComponent(remoteJobRef)}`, {
-        headers: { authorization: `Bearer ${token}` }
+      const response = await fetch(endpoint(endpointBase, `/v1/images/generations/${encodeURIComponent(remoteJobRef)}`), {
+        headers: { authorization: `Bearer ${token}` },
+        redirect: 'error',
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
       });
-      let payload;
-      try { payload = await response.json(); } catch { throw new Error(`provider polling returned HTTP ${response.status}`); }
+      const payload = await readJsonResponse(response);
       if (!response.ok) throw new Error(`provider polling returned HTTP ${response.status}`);
       const parsed = parseProviderResponse({ id: 'grok-image' }, payload);
       parsed.transport_status = response.status;
@@ -327,10 +360,15 @@ function createGrokAdapter() {
     },
     async download(remoteUrl) {
       const parsed = new URL(remoteUrl);
-      if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && ['127.0.0.1', 'localhost', '::1'].includes(parsed.hostname))) throw new Error('provider media URL was not HTTPS or loopback');
-      const response = await fetch(parsed, { headers: { authorization: `Bearer ${token}` } });
+      const configured = new URL(endpointBase);
+      if (parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error('provider media URL contains unsupported URL components');
+      if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && LOOPBACK_HOSTS.has(parsed.hostname))) throw new Error('provider media URL was not HTTPS or loopback');
+      const sameOrigin = parsed.origin === configured.origin;
+      if (!sameOrigin && parsed.hostname !== 'x.ai' && !parsed.hostname.endsWith('.x.ai')) throw new Error('provider media URL must remain on the configured origin or an x.ai host');
+      const headers = sameOrigin ? { authorization: `Bearer ${token}` } : {};
+      const response = await fetch(parsed, { headers, redirect: 'error', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
       if (!response.ok) throw new Error(`provider media download returned HTTP ${response.status}`);
-      const bytes = Buffer.from(await response.arrayBuffer());
+      const bytes = await readLimited(response, MAX_BYTES - 1);
       return { bytes, media_content_type: response.headers.get('content-type') || 'image/unknown', transport_status: response.status };
     }
   };
@@ -402,7 +440,13 @@ async function submitGrokOperation(request, directory, state) {
   const adapter = createGrokAdapter();
   let result;
   try {
-    result = state.phase === 'submitted' ? await adapter.poll(state.remote_job_ref) : await adapter.submit(request, state.operation_key);
+    if (state.phase === 'reserved') {
+      state.phase = 'submitting';
+      await writeState(directory, state);
+      result = await adapter.submit(request, state.operation_key);
+    } else {
+      result = await adapter.poll(state.remote_job_ref);
+    }
   } catch {
     if (state.phase !== 'submitted') {
       state.phase = 'ambiguous';
@@ -442,7 +486,7 @@ async function runOperation(request, options = {}) {
     let state = await readJson(statePath(directory));
     if (state.phase === 'admitted') return state;
     if (state.phase === 'downloaded') return state;
-    if (state.phase === 'ambiguous') throw new Error('operation is ambiguous; use reconcile before another provider call');
+    if (state.phase === 'ambiguous' || state.phase === 'submitting') throw new Error('operation submission is ambiguous; use reconcile before another provider call');
     if (request.route_id === 'codex-image') {
       await writeState(directory, state);
       console.log(JSON.stringify({ operation_key: key, phase: state.phase, next: 'import the private Codex image result, then run admit' }));
@@ -462,7 +506,7 @@ function sourcePathFromState(directory, state) {
   return candidate;
 }
 
-async function importOperation(operationPath, sourceFile) {
+async function importOperationUnlocked(operationPath, sourceFile) {
   const directory = path.resolve(operationPath);
   assertInside(OPERATIONS_ROOT, directory, 'operation directory');
   const state = await readJson(statePath(directory));
@@ -486,18 +530,43 @@ async function importOperation(operationPath, sourceFile) {
   return state;
 }
 
+async function importOperation(operationPath, sourceFile) {
+  const directory = path.resolve(operationPath);
+  assertInside(OPERATIONS_ROOT, directory, 'operation directory');
+  const release = await acquireLock(directory);
+  try {
+    return await importOperationUnlocked(directory, sourceFile);
+  } finally {
+    await release();
+  }
+}
+
 async function identifyImage(filePath) {
+  let version = 'unknown';
+  try {
+    const versionResult = await execFile('magick', ['-version'], { maxBuffer: 4096 });
+    const line = versionResult.stdout.trim().split('\n')[0] || '';
+    version = line.match(/ImageMagick\s+([^\s]+)/)?.[1] || line || version;
+  } catch {
+    try {
+      const versionResult = await execFile('identify', ['-version'], { maxBuffer: 4096 });
+      const line = versionResult.stdout.trim().split('\n')[0] || '';
+      version = line.match(/ImageMagick\s+([^\s]+)/)?.[1] || line || version;
+    } catch {
+      throw new Error('ImageMagick is required to record a full decode');
+    }
+  }
   try {
     const result = await execFile('magick', ['identify', '-format', '%m %w %h', filePath], { maxBuffer: 4096 });
-    const [format, width, height] = result.stdout.trim().split(/\s+/);
-    return { tool: 'ImageMagick', version: format || 'identify', width: Number(width), height: Number(height) };
+    const [, width, height] = result.stdout.trim().split(/\s+/);
+    return { tool: 'ImageMagick', version, width: Number(width), height: Number(height) };
   } catch {
     try {
       const result = await execFile('identify', ['-format', '%m %w %h', filePath], { maxBuffer: 4096 });
-      const [format, width, height] = result.stdout.trim().split(/\s+/);
-      return { tool: 'ImageMagick', version: format || 'identify', width: Number(width), height: Number(height) };
+      const [, width, height] = result.stdout.trim().split(/\s+/);
+      return { tool: 'ImageMagick', version, width: Number(width), height: Number(height) };
     } catch {
-      return { tool: 'header-audit', version: 'node-signature-reader', width: 0, height: 0 };
+      throw new Error('ImageMagick could not decode the admitted image');
     }
   }
 }
@@ -549,19 +618,32 @@ export function sanitizeReceipt(result, operation) {
   return receiptFor(state, publicHash, result?.completed_at || now(), result?.media_content_type || 'image/webp');
 }
 
-async function updateHtmlState(caseId, routeId, stateKind) {
-  const htmlPath = path.join(REPOSITORY_ROOT, 'index.html');
+async function updateHtmlState(caseId, routeId, stateKind, repositoryRoot = REPOSITORY_ROOT, facts = null) {
+  const htmlPath = path.join(path.resolve(repositoryRoot), 'index.html');
   const html = await fs.readFile(htmlPath, 'utf8');
   const keyPattern = new RegExp(`(<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[^>]*data-state=")planned("[^>]*>)`, 'i');
-  if (!keyPattern.test(html)) return;
+  if (!keyPattern.test(html)) throw new Error(`HTML projection for ${caseId}/${routeId} is not in planned state`);
   const updated = html.replace(keyPattern, `$1${stateKind}$2`);
   const cardPattern = new RegExp(`(<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[\\s\\S]*?<span class="status-tag">)PLANNED(</span>[\\s\\S]*?<p class="planned-note">)Awaiting admitted output(</p>)`, 'i');
-  const withLabel = updated.replace(cardPattern, '$1GENERATED$2Admitted output$3');
+  const labelReplacements = updated.match(cardPattern) ? 1 : 0;
+  let withLabel = updated.replace(cardPattern, (match, prefix, between, closing) => `${prefix}GENERATED${between}Admitted output${closing}`);
+  if (labelReplacements !== 1) throw new Error(`HTML status projection for ${caseId}/${routeId} matched ${labelReplacements} cards`);
+  const admissionPattern = new RegExp(`(<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[\\s\\S]*?<dt>Admission</dt><dd>)Planned; no public bytes yet(</dd>)`, 'i');
+  withLabel = withLabel.replace(admissionPattern, '$1Admitted; public bytes available$2');
+  if (facts?.width && facts?.height) {
+    const dimensionsPattern = new RegExp(`(<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[\\s\\S]*?<img\\b[^>]*\\bwidth=")\\d+("\\s+height=")\\d+`, 'i');
+    let dimensionReplacements = 0;
+    withLabel = withLabel.replace(dimensionsPattern, (match, prefix, between) => {
+      dimensionReplacements += 1;
+      return `${prefix}${facts.width}${between}${facts.height}`;
+    });
+    if (dimensionReplacements !== 1) throw new Error(`HTML dimension projection for ${caseId}/${routeId} matched ${dimensionReplacements} images`);
+  }
   await atomicWrite(htmlPath, withLabel, 0o644);
 }
 
-async function updateManifest(state, publicHash, publicBytes, facts, receiptHash, admission) {
-  const manifestPath = path.join(REPOSITORY_ROOT, 'data/comparison.json');
+async function updateManifest(state, publicHash, publicBytes, facts, receiptHash, admission, repositoryRoot = REPOSITORY_ROOT) {
+  const manifestPath = path.join(path.resolve(repositoryRoot), 'data/comparison.json');
   const manifest = parseManifest(await fs.readFile(manifestPath, 'utf8'));
   const sample = manifest.samples[state.case_id]?.[state.route_id];
   if (!sample) throw new Error('operation references an unknown manifest cell');
@@ -600,8 +682,28 @@ export async function admitOperation(operationPath, repositoryRoot = REPOSITORY_
   const release = await acquireLock(directory);
   try {
     const state = await readJson(statePath(directory));
-    if (state.phase === 'admitted') return state;
+    if (state.phase === 'admitted') {
+      try {
+        const manifest = await loadManifest();
+        const cell = manifest.samples[state.case_id]?.[state.route_id];
+        const media = path.resolve(repositoryRoot, mediaPath('image', state.case_id, state.route_id));
+        const receipt = path.resolve(repositoryRoot, receiptPath(state.case_id, state.route_id));
+        if (!cell || cell.state.kind !== 'generated' || !cell.asset || !cell.receipt_sha256 || !await fs.stat(media).catch(() => null) || !await fs.stat(receipt).catch(() => null)) throw new Error('admitted operation has an incomplete public projection');
+        if (sha256(await fs.readFile(media)) !== cell.asset.sha256 || sha256(await fs.readFile(receipt)) !== cell.receipt_sha256) throw new Error('admitted operation does not match public hashes');
+        const html = await fs.readFile(path.resolve(repositoryRoot, 'index.html'), 'utf8');
+        const pattern = new RegExp(`<figure\\b[^>]*data-case-id="${state.case_id}"[^>]*data-route-id="${state.route_id}"[^>]*data-state="generated"`, 'i');
+        if (!pattern.test(html)) throw new Error('admitted operation has an out-of-date HTML projection');
+        return state;
+      } catch {
+        state.phase = 'downloaded';
+        await writeState(directory, state);
+      }
+    }
     if (state.phase !== 'downloaded') throw new Error(`operation must be downloaded before admission (currently ${state.phase})`);
+    const manifest = await loadManifest();
+    const expectedRequest = requestFor(manifest, state.case_id, state.route_id);
+    if (operationKey(expectedRequest) !== state.request_sha256) throw new Error('operation key does not match the current manifest request');
+    if (manifest.samples[state.case_id][state.route_id].state.kind !== 'planned') throw new Error('manifest cell is no longer planned for this operation');
     const sourcePath = sourcePathFromState(directory, state);
     const sourceBytes = await fs.readFile(sourcePath);
     const sourceHeader = inspectImageHeader(sourceBytes);
@@ -631,7 +733,7 @@ export async function admitOperation(operationPath, repositoryRoot = REPOSITORY_
     const publicReceiptPath = path.resolve(repositoryRoot, receiptPath(state.case_id, state.route_id));
     assertInside(path.resolve(repositoryRoot), publicReceiptPath, 'public receipt path');
     await atomicWrite(publicReceiptPath, receiptBytes.toString('utf8'), 0o644);
-    await updateManifest(state, publicHash, publicBytes.length, facts, receiptHash, { provenance: derivative.provenance, decode, reviewed_on: reviewDate });
+    await updateManifest(state, publicHash, publicBytes.length, facts, receiptHash, { provenance: derivative.provenance, decode, reviewed_on: reviewDate }, repositoryRoot);
     state.phase = 'admitted';
     state.public_sha256 = publicHash;
     state.public_bytes = publicBytes.length;
@@ -639,7 +741,7 @@ export async function admitOperation(operationPath, repositoryRoot = REPOSITORY_
     state.public_receipt = receiptPath(state.case_id, state.route_id);
     state.completed_at = completedAt;
     await writeState(directory, state);
-    await updateHtmlState(state.case_id, state.route_id, 'generated');
+    await updateHtmlState(state.case_id, state.route_id, 'generated', repositoryRoot, facts);
     return state;
   } finally {
     await release();
@@ -652,10 +754,10 @@ async function reconcileOperation(operationPath, options) {
   const release = await acquireLock(directory);
   try {
     const state = await readJson(statePath(directory));
-    if (state.phase !== 'ambiguous' && state.phase !== 'reserved' && state.phase !== 'submitted') throw new Error(`cannot reconcile ${state.phase} operation`);
+    if (!['ambiguous', 'submitting', 'reserved', 'submitted'].includes(state.phase)) throw new Error(`cannot reconcile ${state.phase} operation`);
     if (options.file) {
       // Import performs its own header and size checks; release first to avoid nested lock acquisition.
-      state.phase = state.phase === 'ambiguous' ? 'reserved' : state.phase;
+      state.phase = ['ambiguous', 'submitting'].includes(state.phase) ? 'reserved' : state.phase;
       await writeState(directory, state);
     } else if (options.remoteJobRef) {
       const remoteJobRef = String(options.remoteJobRef);
@@ -694,6 +796,14 @@ function parseArgs(argv) {
 }
 
 async function main(argv) {
+  if (argv[0] === '--help' || argv[0] === '-h') {
+    console.log('Usage: node scripts/capture.mjs <reserve|run|import|admit|reconcile> [options]');
+    console.log('  reserve/run: --case CASE --route ROUTE [--dry-run]');
+    console.log('  import: --operation .work/operations/KEY --file PRIVATE_IMAGE');
+    console.log('  admit: --operation .work/operations/KEY --reviewed-on YYYY-MM-DD [--dry-run]');
+    console.log('  reconcile: --operation .work/operations/KEY (--file PRIVATE_IMAGE | --remote-job-ref REF)');
+    return;
+  }
   const options = parseArgs(argv);
   if (options.help || !options.command) {
     console.log('Usage: node scripts/capture.mjs <reserve|run|import|admit|reconcile> [options]');

@@ -634,6 +634,16 @@ main {
   margin-top: 24px;
 }
 
+.availability-note {
+  margin: 24px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .note-block {
   min-width: 0;
   padding: 18px 0 0;

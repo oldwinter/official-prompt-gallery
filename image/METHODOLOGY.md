@@ -32,8 +32,8 @@ made to make those differences disappear.
 ## Admission and derivatives
 
 Capture state is private under ignored `.work/`. A source image is checked for
-an image signature and dimensions, fully decoded with the available local image
-tool when possible, and reviewed for nonblank content by a person before
+an image signature and dimensions, fully decoded with ImageMagick, and reviewed
+for nonblank content by a person before
 admission. The browser receives a WebP derivative below GitHub Pages' 25 MiB
 per-file limit. Its SHA-256, source hash, and transform arguments are recorded
 in the manifest and receipt. CI checks the admitted bytes and headers offline;

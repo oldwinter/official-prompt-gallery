@@ -94,7 +94,7 @@
     function updateZoomText() {
       var percentage = Math.round(zoom * 100);
       zoomInput.value = String(zoom);
-      zoomInput.setAttribute('aria-valuenow', String(percentage));
+      zoomInput.setAttribute('aria-valuenow', String(zoom));
       zoomInput.setAttribute('aria-valuetext', percentage + ' percent');
       if (zoomOutput) zoomOutput.textContent = percentage + '%';
       inspectorImage.style.transform = 'scale(' + zoom + ')';
@@ -224,6 +224,8 @@
       if (event.key === 'Escape') {
         event.preventDefault();
         close();
+      } else if (event.target && /^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(event.target.tagName)) {
+        return;
       } else if (event.key === 'ArrowLeft' && providers.length > 1) {
         event.preventDefault();
         setProvider(providerIndex - 1);

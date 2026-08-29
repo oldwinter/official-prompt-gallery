@@ -20,3 +20,5 @@ jobs:
           node --check scripts/capture.mjs
       - name: Validate authoring projection
         run: node scripts/validate.mjs --mode authoring
+      - name: Run offline smoke fixture
+        run: node scripts/fixtures/smoke.mjs

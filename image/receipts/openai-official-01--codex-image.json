@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "operation_key": "5287dec46981f9f937ba8bd4c0232e01c434edbf74003312ec6503ec5a74c643",
+  "request_sha256": "5287dec46981f9f937ba8bd4c0232e01c434edbf74003312ec6503ec5a74c643",
+  "terminal_status": "succeeded",
+  "started_at": "2026-08-29T17:47:37.824Z",
+  "completed_at": "2026-08-29T17:55:43.335Z",
+  "transport": {
+    "status_code": 200,
+    "media_content_type": "image/png"
+  },
+  "served_model": {
+    "kind": "not-exposed",
+    "reason": "codex-route-does-not-return-served-snapshot"
+  },
+  "cost": {
+    "kind": "included-entitlement-amount-not-exposed"
+  },
+  "response_media_sha256": "e6bc7969093c958c7855601c7a8be1bcf4f12575fa6167aabd6190b35f678d46"
+}

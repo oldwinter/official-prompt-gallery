@@ -200,6 +200,7 @@ function validateCase(promptCase, caseId, location, errors) {
   if (!exactKeys(promptCase.source, ['publisher', 'title', 'canonical_url', 'accessed_on', 'location_note'], `${location}.source`, errors)) return;
   if (promptCase.source.publisher !== expected.publisher) errors.push({ code: 'publisher', path: `${location}.source.publisher`, message: 'does not match the official publisher' });
   if (typeof promptCase.source.title !== 'string' || !promptCase.source.title.trim()) errors.push({ code: 'citation-title', path: `${location}.source.title`, message: 'must be non-empty' });
+  if (promptCase.source.canonical_url !== expected.url) errors.push({ code: 'citation-url', path: `${location}.source.canonical_url`, message: 'must match the canonical official guide URL' });
   validateCitationUrl(promptCase.source.canonical_url, caseId, `${location}.source.canonical_url`, errors);
   if (!isIsoDate(promptCase.source.accessed_on)) errors.push({ code: 'accessed-on', path: `${location}.source.accessed_on`, message: 'must be a real YYYY-MM-DD date' });
   if (typeof promptCase.source.location_note !== 'string' || !promptCase.source.location_note.trim()) errors.push({ code: 'location-note', path: `${location}.source.location_note`, message: 'must be non-empty' });
@@ -316,8 +317,6 @@ function validateStateAndEvidence(sample, manifest, caseId, routeId, location, e
   const decode = sample.admission.full_decode;
   if (!isPlainObject(decode) || !exactKeys(decode, ['tool', 'version'], `${location}.admission.full_decode`, errors) || typeof decode.tool !== 'string' || !decode.tool.trim() || typeof decode.version !== 'string' || !decode.version.trim()) errors.push({ code: 'decode', path: `${location}.admission.full_decode`, message: 'must identify a decode tool and version' });
   if (!isPlainObject(sample.admission.nonblank_review) || !exactKeys(sample.admission.nonblank_review, ['kind', 'reviewed_on'], `${location}.admission.nonblank_review`, errors) || sample.admission.nonblank_review.kind !== 'human-reviewed' || !isIsoDate(sample.admission.nonblank_review.reviewed_on)) errors.push({ code: 'nonblank', path: `${location}.admission.nonblank_review`, message: 'must record human-reviewed and a date' });
-  void caseId;
-  void routeId;
 }
 
 function validateAbsent(value, location, reason, errors) {
@@ -368,15 +367,16 @@ function escapeRegExp(value) {
 export function validateHtmlProjection(html, manifest) {
   const errors = [];
   if (typeof html !== 'string' || !html.trim()) return [{ code: 'html', path: 'index.html', message: 'HTML is empty' }];
-  const comparisonAt = html.indexOf('id="comparison"');
-  const methodologyAt = html.indexOf('METHODOLOGY.md');
+  const visibleHtml = html.replace(/<!--[\s\S]*?-->/g, '').replace(/<script\b[\s\S]*?<\/script>/gi, '').replace(/<style\b[\s\S]*?<\/style>/gi, '');
+  const comparisonAt = visibleHtml.indexOf('id="comparison"');
+  const methodologyAt = visibleHtml.indexOf('METHODOLOGY.md');
   if (comparisonAt < 0) errors.push({ code: 'html-anchor', path: 'index.html', message: 'missing comparison section' });
   if (methodologyAt >= 0 && comparisonAt >= 0 && methodologyAt < comparisonAt) errors.push({ code: 'html-order', path: 'index.html', message: 'methodology must follow the comparison' });
-  if (!/<main\b/i.test(html) || !/<noscript\b/i.test(html)) errors.push({ code: 'html-semantic', path: 'index.html', message: 'main and no-JavaScript projection are required' });
+  if (!/<main\b/i.test(visibleHtml) || !/<noscript\b/i.test(visibleHtml)) errors.push({ code: 'html-semantic', path: 'index.html', message: 'main and no-JavaScript projection are required' });
   if (!/assets\/image-inspector\.js/i.test(html)) errors.push({ code: 'html-script', path: 'index.html', message: 'image inspector script is not referenced' });
-  if (/data-(?:winner|rank|score|preferred|recommend)/i.test(html) || /<(?:winner|rank|score|recommendation)\b/i.test(html)) errors.push({ code: 'html-policy', path: 'index.html', message: 'winner, rank, score, or recommendation markup is forbidden' });
+  if (/data-(?:winner|rank|score|preferred|recommend)/i.test(visibleHtml) || /<(?:winner|rank|score|recommendation)\b/i.test(visibleHtml)) errors.push({ code: 'html-policy', path: 'index.html', message: 'winner, rank, score, or recommendation markup is forbidden' });
 
-  const figures = [...html.matchAll(/<figure\b[^>]*data-case-id="([^"]+)"[^>]*data-route-id="([^"]+)"[^>]*>([\s\S]*?)<\/figure>/gi)];
+  const figures = [...visibleHtml.matchAll(/<figure\b[^>]*data-case-id="([^"]+)"[^>]*data-route-id="([^"]+)"[^>]*>([\s\S]*?)<\/figure>/gi)];
   const seen = new Set();
   for (const match of figures) {
     const [, caseId, routeId, body] = match;
@@ -385,13 +385,24 @@ export function validateHtmlProjection(html, manifest) {
     seen.add(key);
     if (!CASE_IDS.includes(caseId) || !ROUTE_IDS.includes(routeId)) errors.push({ code: 'html-cell', path: `index.html:${key}`, message: 'unknown output figure key' });
     const expectedPath = mediaPath('image', caseId, routeId);
-    const imagePattern = new RegExp(`<img\\b[^>]*src="${escapeRegExp(expectedPath)}"`, 'i');
-    const linkPattern = new RegExp(`<a\\b[^>]*href="${escapeRegExp(expectedPath)}"`, 'i');
-    if (!imagePattern.test(body)) errors.push({ code: 'html-path', path: `index.html:${key}`, message: `missing image src ${expectedPath}` });
-    if (!linkPattern.test(body)) errors.push({ code: 'html-path', path: `index.html:${key}`, message: `missing ordinary image link ${expectedPath}` });
-    if (!/data-state="(?:planned|generated)"/i.test(match[0])) errors.push({ code: 'html-state', path: `index.html:${key}`, message: 'figure must project planned or generated state' });
+    const sample = CASE_IDS.includes(caseId) && ROUTE_IDS.includes(routeId) ? manifest.samples[caseId][routeId] : null;
+    if (sample?.state.kind === 'planned') {
+      if (!new RegExp(`data-asset-path="${escapeRegExp(expectedPath)}"`, 'i').test(body)) errors.push({ code: 'html-path', path: `index.html:${key}`, message: `missing planned asset path ${expectedPath}` });
+      if (!/src="assets\/planned-image\.webp"/i.test(body)) errors.push({ code: 'html-path', path: `index.html:${key}`, message: 'missing local planned placeholder' });
+    } else {
+      const imagePattern = new RegExp(`<img\\b[^>]*src="${escapeRegExp(expectedPath)}"`, 'i');
+      const linkPattern = new RegExp(`<a\\b[^>]*href="${escapeRegExp(expectedPath)}"`, 'i');
+      if (!imagePattern.test(body)) errors.push({ code: 'html-path', path: `index.html:${key}`, message: `missing image src ${expectedPath}` });
+      if (!linkPattern.test(body)) errors.push({ code: 'html-path', path: `index.html:${key}`, message: `missing ordinary image link ${expectedPath}` });
+    }
+    const stateMatch = match[0].match(/data-state="(planned|generated)"/i);
+    if (!stateMatch) errors.push({ code: 'html-state', path: `index.html:${key}`, message: 'figure must project planned or generated state' });
     if (CASE_IDS.includes(caseId) && ROUTE_IDS.includes(routeId)) {
-      const sample = manifest.samples[caseId][routeId];
+      if (stateMatch && stateMatch[1].toLowerCase() !== sample.state.kind) errors.push({ code: 'html-state', path: `index.html:${key}`, message: `figure state must match manifest (${sample.state.kind})` });
+      const statusExpected = sample.state.kind === 'generated' ? 'GENERATED' : 'PLANNED';
+      if (!new RegExp(`<span\\b[^>]*class="status-tag"[^>]*>${statusExpected}<\\/span>`, 'i').test(body)) errors.push({ code: 'html-status', path: `index.html:${key}`, message: `status tag must be ${statusExpected}` });
+      const noteExpected = sample.state.kind === 'generated' ? 'Admitted output' : 'Awaiting admitted output';
+      if (!new RegExp(`<p\\b[^>]*class="planned-note"[^>]*>${escapeRegExp(noteExpected)}<\\/p>`, 'i').test(body)) errors.push({ code: 'html-status', path: `index.html:${key}`, message: `media note must be ${noteExpected}` });
       if (!new RegExp(`alt="${escapeRegExp(sample.alt_text)}"`, 'i').test(body)) errors.push({ code: 'html-alt', path: `index.html:${key}`, message: 'figure alt text differs from manifest' });
       const requestedId = manifest.routes[routeId].requested_model.id;
       if (!body.includes(requestedId)) errors.push({ code: 'html-model', path: `index.html:${key}`, message: 'requested model is not visible' });
@@ -400,12 +411,12 @@ export function validateHtmlProjection(html, manifest) {
   if (figures.length !== 4 || seen.size !== 4) errors.push({ code: 'html-cross-product', path: 'index.html', message: 'exactly four unique output figures are required' });
   for (const caseId of CASE_IDS) {
     const expected = EXPECTED[caseId];
-    if (!html.includes(expected.prompt)) errors.push({ code: 'html-prompt', path: `index.html:${caseId}`, message: 'exact prompt is not visible' });
-    if (!html.includes(expected.url)) errors.push({ code: 'html-citation', path: `index.html:${caseId}`, message: 'official citation URL is not visible' });
+    if (!visibleHtml.includes(expected.prompt)) errors.push({ code: 'html-prompt', path: `index.html:${caseId}`, message: 'exact prompt is not visible' });
+    if (!new RegExp(`<a\\b[^>]*href="${escapeRegExp(expected.url)}"`, 'i').test(visibleHtml)) errors.push({ code: 'html-citation', path: `index.html:${caseId}`, message: 'official citation link is not visible' });
   }
   const disclosureNeedles = ['AI-generated', 'one sample', 'capability-aligned', 'No winner'];
   disclosureNeedles.forEach((needle) => {
-    if (!html.toLowerCase().includes(needle.toLowerCase())) errors.push({ code: 'html-disclosure', path: 'index.html', message: `visible disclosure must mention ${needle}` });
+    if (!visibleHtml.toLowerCase().includes(needle.toLowerCase())) errors.push({ code: 'html-disclosure', path: 'index.html', message: `visible disclosure must mention ${needle}` });
   });
   return errors;
 }
@@ -479,13 +490,14 @@ async function checkFileMime(filePath, expectedMime) {
     const mime = result.stdout.trim().split(';')[0];
     return mime === expectedMime || (expectedMime === 'image/jpeg' && mime === 'image/jpg');
   } catch {
-    return true;
+    return false;
   }
 }
 
-function validateReceipt(receipt, sample, routeId, location, errors) {
+function validateReceipt(receipt, sample, routeId, location, errors, manifest, caseId) {
   if (!isPlainObject(receipt) || !exactKeys(receipt, ['schema_version', 'operation_key', 'request_sha256', 'terminal_status', 'started_at', 'completed_at', 'transport', 'served_model', 'cost', 'response_media_sha256'], location, errors)) return;
-  if (receipt.schema_version !== 1 || !isSha256(receipt.operation_key) || !isSha256(receipt.request_sha256) || receipt.request_sha256 !== sample.state.request_sha256 || receipt.operation_key !== sample.state.request_sha256) errors.push({ code: 'receipt', path: location, message: 'receipt identity does not match the generated cell' });
+  const expectedRequest = requestDigest(manifest, caseId, routeId);
+  if (receipt.schema_version !== 1 || !isSha256(receipt.operation_key) || !isSha256(receipt.request_sha256) || receipt.request_sha256 !== sample.state.request_sha256 || receipt.operation_key !== sample.state.request_sha256 || receipt.operation_key !== expectedRequest) errors.push({ code: 'receipt', path: location, message: 'receipt identity does not match the generated cell' });
   if (receipt.terminal_status !== 'succeeded' || !isIsoInstant(receipt.started_at) || !isIsoInstant(receipt.completed_at)) errors.push({ code: 'receipt', path: location, message: 'receipt must describe a succeeded UTC operation' });
   if (!isPlainObject(receipt.transport) || !exactKeys(receipt.transport, ['status_code', 'media_content_type'], `${location}.transport`, errors) || !Number.isInteger(receipt.transport.status_code) || receipt.transport.status_code < 200 || receipt.transport.status_code >= 400 || typeof receipt.transport.media_content_type !== 'string' || !/^image\/(?:png|jpe?g|webp)$/i.test(receipt.transport.media_content_type)) errors.push({ code: 'receipt-transport', path: `${location}.transport`, message: 'transport evidence is incomplete or unsafe' });
   validateServedModel(receipt.served_model, routeId, `${location}.served_model`, errors);
@@ -527,7 +539,7 @@ async function inspectPublicFiles(manifest, root, mode, errors) {
         if (bytes.length !== sample.asset.bytes) errors.push({ code: 'media-bytes', path: relativeMedia, message: 'byte count does not match manifest' });
         if (bytes.length >= MAX_BYTES) errors.push({ code: 'media-size', path: relativeMedia, message: 'file must be strictly smaller than 25 MiB' });
         const facts = imageHeader(bytes);
-        if (facts.format === 'unknown' || !['image/png', 'image/jpeg', 'image/webp'].includes(facts.mime)) errors.push({ code: 'media-signature', path: relativeMedia, message: 'unsupported image signature' });
+        if (facts.format !== 'webp' || facts.mime !== 'image/webp') errors.push({ code: 'media-signature', path: relativeMedia, message: 'public image must be a WebP file' });
         if (facts.animated) errors.push({ code: 'media-animation', path: relativeMedia, message: 'animated images are not allowed' });
         if (facts.format !== sample.media_facts.format || facts.width !== sample.media_facts.width || facts.height !== sample.media_facts.height || facts.alpha !== sample.media_facts.alpha) errors.push({ code: 'media-facts', path: relativeMedia, message: 'header facts differ from manifest' });
         if (!(await checkFileMime(mediaFile, facts.mime))) errors.push({ code: 'media-file-type', path: relativeMedia, message: 'file command MIME does not match image header' });
@@ -537,7 +549,7 @@ async function inspectPublicFiles(manifest, root, mode, errors) {
       if (!receipt) errors.push({ code: 'missing-receipt', path: relativeReceipt, message: 'generated cell receipt is missing' });
       else if (sha256(receipt) !== sample.receipt_sha256) errors.push({ code: 'receipt-hash', path: relativeReceipt, message: 'receipt SHA-256 does not match manifest' });
       else {
-        try { validateReceipt(JSON.parse(receipt.toString('utf8')), sample, routeId, relativeReceipt, errors); }
+        try { validateReceipt(JSON.parse(receipt.toString('utf8')), sample, routeId, relativeReceipt, errors, manifest, caseId); }
         catch (error) { errors.push({ code: 'receipt', path: relativeReceipt, message: `receipt JSON is invalid: ${error.message}` }); }
       }
     }

@@ -13,12 +13,18 @@ The comparison is deliberately small and honest:
 - capability-aligned requests, not pixel-identical conditions;
 - no winner, score, rank, or recommendation.
 
-All admitted media is AI-generated. The Codex image route requests the
+All admitted media is AI-generated; the current checkout has two admitted Codex
+outputs and two planned Grok cells because the configured gateway does not
+expose the requested current xAI image model. The Codex image route requests the
 `gpt-image-2` family through a private Codex entitlement path. The second
 route requests `grok-imagine-image-2.0` through a private Sub2API endpoint.
 The route records requested identity separately from served identity; the
 Codex route does not expose a served snapshot, so the manifest says exactly
 that rather than guessing.
+
+No fallback Grok model was silently substituted: the available private gateway
+rejected `grok-imagine-image-2.0`, so those two cells stay `planned` until an
+approved route exposes the requested model.
 
 ## Validate
 
@@ -30,7 +36,7 @@ node scripts/validate.mjs --mode authoring
 node scripts/validate.mjs
 ```
 
-Authoring mode permits the initial four `planned` cells. The default publish
+Authoring mode permits planned cells. The default publish
 mode is the release gate and requires all four admitted images and sanitized
 receipts below 25 MiB.
 
