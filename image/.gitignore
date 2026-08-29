@@ -1,0 +1,18 @@
+# Private authoring state and provider material
+.work/
+.generation/
+.env
+.env.*
+!.env.example
+raw/
+private/
+*.orig
+*.original
+*.receipt.raw
+
+# Local tooling and editor state
+.DS_Store
+.idea/
+.vscode/
+node_modules/
+npm-debug.log*
