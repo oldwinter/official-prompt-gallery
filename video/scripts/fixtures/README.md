@@ -1,7 +1,7 @@
 # Validation fixture
 
-The checked-in ledger starts with four `planned` cells, so no media bytes or
-provider receipts are needed to exercise the authoring boundary:
+The fixture command is an offline structural check. The checked-in ledger may
+contain admitted cells as well as planned cells, and no provider call is made:
 
 ```console
 node scripts/validate.mjs --mode fixture

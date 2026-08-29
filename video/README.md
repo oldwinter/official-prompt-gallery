@@ -8,11 +8,18 @@ It compares one sample per prompt and route after private authoring:
 | [MiniMax video generation guide](https://platform.minimax.io/docs/guides/video-generation) | `MiniMax-H3` through loopback SGLang | `grok-imagine-video-1.5` through Sub2API |
 | [xAI video generation guide](https://docs.x.ai/developers/model-capabilities/video/generation) | `MiniMax-H3` through loopback SGLang | `grok-imagine-video-1.5` through Sub2API |
 
-The checked-in ledger currently has four `planned` cells. The public page still
-shows both exact prompts, citations, provider labels, and native video controls
-so the evidence boundary is visible before media is admitted. Outputs are
+The checked-in ledger currently has two admitted H3 cells and two `planned`
+Grok cells. The public page shows both exact prompts, citations, provider labels,
+and native video controls so the evidence boundary is visible before every
+media route is admitted. Outputs are
 AI-generated, one sample per case and route, capability-aligned rather than
 pixel-identical, and not a ranking.
+
+The two Grok cells remain `planned` in this first public release. The available
+private gateway catalog did not expose `grok-imagine-video-1.5`, and no direct
+xAI API key was available on the authoring host. No fallback model was silently
+substituted. Provide an approved xAI route, then use the resumable capture flow
+to complete those two cells.
 
 ## View and validate
 
@@ -49,8 +56,9 @@ node scripts/capture.mjs admit --operation .work/operations/OPERATION_KEY
 `run` is the only command that contacts a provider. It is intentionally not
 used by CI. If a submission result is unknowable, the operation becomes
 `ambiguous`; use `reconcile` with a recovered remote job reference or local
-file before polling or admitting it. Admission atomically promotes the MP4,
-poster, sanitized receipt, and generated ledger state.
+file before polling or admitting it. Admission uses per-file atomic writes for
+the MP4, poster, sanitized receipt, and generated ledger state; the validator
+is the consistency check after an interrupted admission.
 
 ## Model and rights boundary
 
@@ -65,6 +73,8 @@ license. See [METHODOLOGY.md](METHODOLOGY.md) and [DATA_NOTICE.md](DATA_NOTICE.m
 
 ## GitHub Pages
 
-`check.yml` is a read-only, secretless authoring check. `pages.yml` repeats the
-default publish validation and uploads the repository root as a Pages artifact;
-it does not build, call a provider, install packages, or require a server.
+`check.yml` is a read-only, secretless authoring check. `pages.yml` validates the
+same static tree while allowing clearly marked planned cells, then uploads the
+repository root as a Pages artifact; it does not build, call a provider, install
+packages, or require a server. Run the default validator locally as the strict
+four-cell publish gate.

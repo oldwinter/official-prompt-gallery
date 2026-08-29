@@ -682,6 +682,15 @@ button:disabled {
   margin: 28px 0 0;
 }
 
+.availability-note {
+  margin: 24px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
 .site-footer {
   display: flex;
   gap: 20px;

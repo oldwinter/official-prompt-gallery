@@ -19,6 +19,9 @@ const OPERATIONS_ROOT = join(PRIVATE_ROOT, "operations");
 const H3_DEFAULT_BASE = "http://127.0.0.1:30010";
 const OPERATION_HASH_PATTERN = /^[a-f0-9]{64}$/;
 const ISO_INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+const MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
+const REQUEST_TIMEOUT_MS = 120_000;
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
 function now() {
   return new Date().toISOString().replace(/(\.\d{3})\d+Z$/, "$1Z");
@@ -108,34 +111,75 @@ function requestDigest(request) {
 
 function routePayload(request) {
   const params = request.parameters;
-  const resolution = params.requested_resolution.kind === "short-edge-pixels"
-    ? `${params.requested_resolution.pixels}px-short-edge`
-    : params.requested_resolution.value;
   return {
     model: request.requested_model,
     prompt: request.prompt,
-    duration: params.duration_seconds,
-    duration_seconds: params.duration_seconds,
+    duration: Math.round(params.duration_seconds),
     aspect_ratio: params.aspect_ratio,
-    resolution,
+    resolution: params.requested_resolution.value,
   };
+}
+
+export function h3FormData(request) {
+  const params = request.parameters;
+  const form = new FormData();
+  form.append("model", "/models/MiniMax-H3");
+  form.append("prompt", request.prompt);
+  form.append("seconds", String(Math.round(params.duration_seconds)));
+  form.append("size", "1344x768");
+  form.append("num_outputs_per_prompt", "1");
+  form.append("extra_body", JSON.stringify({
+    task: "t2va",
+    conditions: [],
+    target: {
+      short_edge: params.requested_resolution.pixels,
+      aspect_ratio: params.aspect_ratio,
+      duration_seconds: params.duration_seconds,
+    },
+    num_outputs_per_prompt: 1,
+    num_inference_steps: 50,
+    flow_shift: 12,
+    audio_flow_shift: 3,
+    quality: "lossless",
+  }));
+  return form;
+}
+
+async function readLimited(response, limit = MAX_RESPONSE_BYTES) {
+  const declared = Number(response.headers.get("content-length") || 0);
+  if (declared > limit) throw new Error(`provider response exceeds ${limit} bytes`);
+  if (!response.body) return Buffer.alloc(0);
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of response.body) {
+    const bytes = Buffer.from(chunk);
+    total += bytes.length;
+    if (total > limit) throw new Error(`provider response exceeds ${limit} bytes`);
+    chunks.push(bytes);
+  }
+  return Buffer.concat(chunks, total);
 }
 
 function routeBase(routeId) {
-  if (routeId === "minimax-h3") return (process.env.H3_API_BASE || H3_DEFAULT_BASE).replace(/\/$/, "");
-  if (routeId === "grok-video") {
-    if (!process.env.GROK_BASE_URL) throw new Error("GROK_BASE_URL is required for the Grok route");
-    return process.env.GROK_BASE_URL.replace(/\/$/, "");
-  }
-  throw new Error(`unsupported route ${routeId}`);
+  const configured = routeId === "minimax-h3" ? (process.env.H3_API_BASE || H3_DEFAULT_BASE) : process.env.GROK_BASE_URL;
+  if (!configured) throw new Error("GROK_BASE_URL is required for the Grok route");
+  const parsed = new URL(configured);
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error("API base URL must not contain credentials, query, or fragment");
+  if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && LOOPBACK_HOSTS.has(parsed.hostname))) throw new Error("API base URL must use HTTPS except for loopback development");
+  return parsed.toString().replace(/\/$/, "");
 }
 
-function routeHeaders(routeId, operation) {
+function endpoint(base, path) {
+  const suffix = path.startsWith("/v1/") && base.endsWith("/v1") ? path.slice(3) : path;
+  return `${base}${suffix}`;
+}
+
+function routeHeaders(routeId, operation, json = true) {
   const headers = {
     accept: "application/json",
-    "content-type": "application/json",
     "idempotency-key": operation,
   };
+  if (json) headers["content-type"] = "application/json";
   if (routeId === "grok-video") {
     if (!process.env.GROK_API_KEY) throw new Error("GROK_API_KEY is required for the Grok route");
     headers.authorization = `Bearer ${process.env.GROK_API_KEY}`;
@@ -175,8 +219,10 @@ export function parseProviderResponse(route, response) {
       ? { kind: "operator-verified-local-deployment", id: "MiniMax-H3", evidence: "local runtime model check" }
       : { kind: "not-exposed", reason: "provider-response-omits-model" };
   const terminal = ["completed", "complete", "succeeded", "success", "done", "finished"].includes(status) || Boolean(mediaUrl);
-  const failed = ["failed", "error", "cancelled", "canceled", "rejected"].includes(status);
+  const failed = ["failed", "error", "cancelled", "canceled", "rejected", "expired", "timeout", "timed_out", "aborted"].includes(status);
+  const pending = ["", "queued", "pending", "processing", "in_progress", "running"].includes(status);
   if (failed) throw new Error("provider reported a terminal failure");
+  if (!terminal && !pending) throw new Error(`provider reported an unknown status: ${status}`);
   if (!remoteJobRef && !mediaUrl && !terminal) throw new Error("provider response omitted a job reference");
   return {
     phase: terminal ? "completed" : "pending",
@@ -189,8 +235,12 @@ export function parseProviderResponse(route, response) {
 }
 
 async function requestJson(url, options) {
-  const response = await fetch(url, options);
-  const text = await response.text();
+  const response = await fetch(url, {
+    ...options,
+    redirect: "error",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  const text = (await readLimited(response, 1024 * 1024)).toString("utf8");
   let body;
   try {
     body = text ? JSON.parse(text) : {};
@@ -206,30 +256,50 @@ function adapterFor(routeId) {
     return {
       submit: async (request, operation) => {
         const base = routeBase(routeId);
-        const result = await requestJson(`${base}/v1/videos`, { method: "POST", headers: routeHeaders(routeId, operation), body: JSON.stringify(routePayload(request)) });
+        const result = await requestJson(endpoint(base, "/v1/videos"), { method: "POST", headers: routeHeaders(routeId, operation, false), body: h3FormData(request) });
         return parseProviderResponse(routeId, result.body);
       },
       poll: async (request, operation, remoteJobRef) => {
         const base = routeBase(routeId);
-        const result = await requestJson(`${base}/v1/videos/${encodeURIComponent(remoteJobRef)}`, { headers: { ...routeHeaders(routeId, operation), accept: "application/json" } });
+        const result = await requestJson(endpoint(base, `/v1/videos/${encodeURIComponent(remoteJobRef)}`), { headers: { ...routeHeaders(routeId, operation), accept: "application/json" } });
         return parseProviderResponse(routeId, result.body);
       },
-      contentUrl: (remoteJobRef) => `${routeBase(routeId)}/v1/videos/${encodeURIComponent(remoteJobRef)}/content`,
+      contentUrl: (remoteJobRef) => endpoint(routeBase(routeId), `/v1/videos/${encodeURIComponent(remoteJobRef)}/content`),
     };
   }
   return {
     submit: async (request, operation) => {
       const base = routeBase(routeId);
-      const result = await requestJson(`${base}/v1/videos/generations`, { method: "POST", headers: routeHeaders(routeId, operation), body: JSON.stringify(routePayload(request)) });
+      const result = await requestJson(endpoint(base, "/v1/videos/generations"), { method: "POST", headers: routeHeaders(routeId, operation), body: JSON.stringify(routePayload(request)) });
       return parseProviderResponse(routeId, result.body);
     },
     poll: async (request, operation, remoteJobRef) => {
       const base = routeBase(routeId);
-      const result = await requestJson(`${base}/v1/videos/generations/${encodeURIComponent(remoteJobRef)}`, { headers: { ...routeHeaders(routeId, operation), accept: "application/json" } });
+      const result = await requestJson(endpoint(base, `/v1/videos/${encodeURIComponent(remoteJobRef)}`), { headers: { ...routeHeaders(routeId, operation), accept: "application/json" } });
       return parseProviderResponse(routeId, result.body);
     },
     contentUrl: () => undefined,
   };
+}
+
+async function downloadMedia(routeId, mediaUrl) {
+  const parsed = new URL(mediaUrl);
+  const base = new URL(routeBase(routeId));
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error("provider media URL contains unsupported URL components");
+  if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && LOOPBACK_HOSTS.has(parsed.hostname))) throw new Error("provider media URL must use HTTPS or loopback HTTP");
+  const sameOrigin = parsed.origin === base.origin;
+  if (routeId === "minimax-h3" && !sameOrigin) throw new Error("H3 media URL must remain on the configured H3 origin");
+  if (routeId === "grok-video" && !sameOrigin && parsed.hostname !== "x.ai" && !parsed.hostname.endsWith(".x.ai")) throw new Error("Grok media URL must remain on the configured origin or an x.ai host");
+  const headers = {};
+  if (routeId === "grok-video" && sameOrigin) headers.authorization = `Bearer ${process.env.GROK_API_KEY}`;
+  const response = await fetch(parsed, {
+    headers,
+    redirect: "error",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`media download failed with status ${response.status}`);
+  const bytes = await readLimited(response, 25 * 1024 * 1024 - 1);
+  return { bytes, contentType: response.headers.get("content-type") || "video/mp4" };
 }
 
 async function atomicJson(filePath, value, mode = 0o600) {
@@ -245,13 +315,27 @@ async function readJson(filePath) {
 
 async function acquireLock(operationDir) {
   const lock = join(operationDir, ".lock");
-  try {
-    await mkdir(lock, { recursive: false, mode: 0o700 });
-  } catch (error) {
-    if (error.code === "EEXIST") throw new Error("operation is already being handled by another process");
-    throw error;
+  const staleAfter = Math.max(60_000, Number(process.env.CAPTURE_LOCK_STALE_MS || 6 * 60 * 60 * 1000));
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await mkdir(lock, { recursive: false, mode: 0o700 });
+      await writeFile(join(lock, "owner"), `${process.pid}\n`, { mode: 0o600 });
+      return async () => rm(lock, { recursive: true, force: true });
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      try {
+        if (Date.now() - lstatSync(lock).mtimeMs > staleAfter) {
+          await rm(lock, { recursive: true, force: true });
+          continue;
+        }
+      } catch (statError) {
+        if (statError.code !== "ENOENT") throw statError;
+        continue;
+      }
+      throw new Error("operation is already being handled by another process");
+    }
   }
-  return async () => rm(lock, { recursive: true, force: true });
+  throw new Error("could not acquire operation lock");
 }
 
 async function reserveInternal(request, privateRoot = PRIVATE_ROOT) {
@@ -282,6 +366,7 @@ async function reserveInternal(request, privateRoot = PRIVATE_ROOT) {
       case_id: request.case_id,
       route_id: request.route_id,
       prompt_sha256: request.prompt_sha256,
+      prompt: request.prompt,
       requested_model: request.requested_model,
       parameters: request.parameters,
     });
@@ -294,10 +379,11 @@ async function reserveInternal(request, privateRoot = PRIVATE_ROOT) {
 function sanitizeOperationState(state) {
   const allowed = {
     reserved: ["phase", "operation_key", "request_sha256", "created_at"],
-    submitted: ["phase", "operation_key", "request_sha256", "remote_job_ref"],
-    ambiguous: ["phase", "operation_key", "request_sha256", "reason"],
-    downloaded: ["phase", "operation_key", "request_sha256", "raw_sha256", "file", "content_type"],
-    admitted: ["phase", "operation_key", "request_sha256", "public_sha256"],
+    submitting: ["phase", "operation_key", "request_sha256", "created_at"],
+    submitted: ["phase", "operation_key", "request_sha256", "created_at", "remote_job_ref"],
+    ambiguous: ["phase", "operation_key", "request_sha256", "created_at", "reason"],
+    downloaded: ["phase", "operation_key", "request_sha256", "created_at", "raw_sha256", "file", "content_type"],
+    admitted: ["phase", "operation_key", "request_sha256", "case_id", "route_id", "public_sha256"],
   };
   if (!state || !allowed[state.phase]) throw new Error("invalid operation state");
   return Object.fromEntries(allowed[state.phase].filter((key) => state[key] !== undefined).map((key) => [key, state[key]]));
@@ -309,17 +395,19 @@ async function submitAndDownload(request, reservation) {
   try {
     let state = await readJson(join(dir, "state.json"));
     if (state.phase === "admitted" || state.phase === "downloaded") return state;
-    if (state.phase === "ambiguous") throw new Error("operation is ambiguous; reconcile it before running again");
+    if (state.phase === "ambiguous" || state.phase === "submitting") throw new Error("operation submission is ambiguous; reconcile it before running again");
     const adapter = adapterFor(request.route_id);
     let result;
     let remoteJobRef = state.remote_job_ref;
     try {
       if (state.phase === "reserved") {
+        state = { phase: "submitting", operation_key: key, request_sha256: state.request_sha256, created_at: state.created_at };
+        await atomicJson(join(dir, "state.json"), sanitizeOperationState(state));
         result = await adapter.submit(request, key);
         if (result.remote_job_ref) remoteJobRef = result.remote_job_ref;
         if (result.phase === "pending" && !remoteJobRef) throw new Error("provider returned pending without a job reference");
         if (remoteJobRef) {
-          state = { phase: "submitted", operation_key: key, request_sha256: state.request_sha256, remote_job_ref: remoteJobRef };
+          state = { phase: "submitted", operation_key: key, request_sha256: state.request_sha256, created_at: state.created_at, remote_job_ref: remoteJobRef };
           await atomicJson(join(dir, "state.json"), sanitizeOperationState(state));
         }
       }
@@ -334,11 +422,12 @@ async function submitAndDownload(request, reservation) {
         if (!result || result.phase !== "completed") throw new Error("provider did not complete before the poll limit");
       }
     } catch (error) {
-      if (state.phase === "reserved") {
+      if (state.phase === "reserved" || state.phase === "submitting") {
         await atomicJson(join(dir, "state.json"), {
           phase: "ambiguous",
           operation_key: key,
           request_sha256: state.request_sha256,
+          created_at: state.created_at,
           reason: "submission outcome could not be established; reconcile before retrying",
         });
       }
@@ -346,21 +435,19 @@ async function submitAndDownload(request, reservation) {
     }
     const mediaUrl = result.media_url || adapter.contentUrl(state.remote_job_ref);
     if (!mediaUrl) throw new Error("provider completed without a media URL");
-    const parsedUrl = new URL(mediaUrl);
-    if (!["http:", "https:"].includes(parsedUrl.protocol)) throw new Error("provider media URL must use HTTP or HTTPS");
-    const response = await fetch(parsedUrl, { headers: request.route_id === "grok-video" ? { authorization: `Bearer ${process.env.GROK_API_KEY}` } : {} });
-    if (!response.ok) throw new Error(`media download failed with status ${response.status}`);
-    const bytes = Buffer.from(await response.arrayBuffer());
-    const extension = (result.content_type || response.headers.get("content-type") || "video/mp4").includes("webm") ? ".webm" : ".mp4";
+    const downloadedMedia = await downloadMedia(request.route_id, mediaUrl);
+    const bytes = downloadedMedia.bytes;
+    const extension = (result.content_type || downloadedMedia.contentType).includes("webm") ? ".webm" : ".mp4";
     const rawFile = join(dir, `raw${extension}`);
     await writeFile(rawFile, bytes, { mode: 0o600 });
     const downloaded = {
       phase: "downloaded",
       operation_key: key,
       request_sha256: state.request_sha256,
+      created_at: state.created_at,
       raw_sha256: sha256(bytes),
       file: basename(rawFile),
-      content_type: result.content_type || response.headers.get("content-type") || "video/mp4",
+      content_type: result.content_type || downloadedMedia.contentType,
     };
     await atomicJson(join(dir, "state.json"), sanitizeOperationState(downloaded));
     await atomicJson(join(dir, "provider-evidence.json"), {
@@ -462,7 +549,7 @@ function operationKeyFromArgument(value) {
   return ensureOperationKey(candidate);
 }
 
-async function importFile(operationDir, sourcePath, posterSource, metadata) {
+async function importFileUnlocked(operationDir, sourcePath, posterSource, metadata) {
   const statePath = join(operationDir, "state.json");
   const state = await readJson(statePath);
   if (!["reserved", "submitted", "ambiguous", "downloaded"].includes(state.phase)) throw new Error(`cannot import into ${state.phase} operation`);
@@ -492,6 +579,15 @@ async function importFile(operationDir, sourcePath, posterSource, metadata) {
   return next;
 }
 
+async function importFile(operationDir, sourcePath, posterSource, metadata) {
+  const release = await acquireLock(operationDir);
+  try {
+    return await importFileUnlocked(operationDir, sourcePath, posterSource, metadata);
+  } finally {
+    await release();
+  }
+}
+
 function defaultGeneratedEvidence(routeId, providerEvidence) {
   if (providerEvidence?.served_model) return providerEvidence.served_model;
   if (routeId === "minimax-h3") return { kind: "operator-verified-local-deployment", id: "MiniMax-H3", evidence: "local runtime model check" };
@@ -503,18 +599,66 @@ function defaultCost(routeId, providerEvidence) {
   return routeId === "minimax-h3" ? { kind: "local-compute-not-priced" } : { kind: "paid-route-amount-not-exposed" };
 }
 
-/** Atomically promote a downloaded, reviewed operation into media, receipt, and the planned cell. */
+async function updateHtmlState(caseId, routeId, repositoryRoot = REPOSITORY_ROOT) {
+  const htmlPath = join(fileURLToPathIfUrl(repositoryRoot), "index.html");
+  const html = await readFile(htmlPath, "utf8");
+  const figurePattern = new RegExp(`(<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[^>]*data-state=")planned("[^>]*>)`, "i");
+  if (!figurePattern.test(html)) return;
+  const updated = html.replace(figurePattern, "$1generated$2");
+  const statusPattern = new RegExp(`(<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[\\s\\S]*?<span class="state-tag">)PLANNED(</span>)`, "i");
+  const statusReplacements = updated.match(statusPattern) ? 1 : 0;
+  const withStatus = updated.replace(statusPattern, (match, prefix, suffix) => `${prefix}GENERATED${suffix}`);
+  if (statusReplacements !== 1) throw new Error(`HTML status projection for ${caseId}/${routeId} matched ${statusReplacements} cards`);
+  const temporary = `${htmlPath}.tmp-${process.pid}`;
+  await writeFile(temporary, withStatus, { mode: 0o644 });
+  await rename(temporary, htmlPath);
+}
+
+/** Promote a downloaded, reviewed operation with per-file atomic writes. */
+async function verifyAdmittedProjection(state, repositoryRoot, operationDir) {
+  const root = fileURLToPathIfUrl(repositoryRoot);
+  const request = state.case_id && state.route_id ? state : await readJson(join(operationDir, "request.json"));
+  const caseId = request.case_id;
+  const routeId = request.route_id;
+  const manifest = parseManifest(await readFile(join(root, "data", "comparison.json"), "utf8"));
+  const cell = manifest.samples[caseId]?.[routeId];
+  if (!cell || cell.state.kind !== "generated") throw new Error("admitted operation has no generated manifest cell");
+  const media = join(root, mediaPath("video", caseId, routeId));
+  const receipt = join(root, `receipts/${caseId}--${routeId}.json`);
+  if (!existsSync(media) || !existsSync(receipt)) throw new Error("admitted operation is missing a public media or receipt file");
+  if (sha256(readFileSync(media)) !== cell.state.asset.sha256 || sha256(readFileSync(receipt)) !== cell.state.receipt_sha256) throw new Error("admitted operation does not match public hashes");
+  const html = await readFile(join(root, "index.html"), "utf8");
+  const pattern = new RegExp(`<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[^>]*data-state="generated"`, "i");
+  if (!pattern.test(html)) throw new Error("admitted operation has an out-of-date HTML projection");
+}
+
 export async function admitOperation(operationDirInput, repositoryRoot = REPOSITORY_ROOT) {
   const operationDir = fileURLToPathIfUrl(operationDirInput);
   const root = fileURLToPathIfUrl(repositoryRoot);
-  const state = await readJson(join(operationDir, "state.json"));
-  if (state.phase !== "downloaded") throw new Error(`admit requires downloaded state, found ${state.phase}`);
+  const release = await acquireLock(operationDir);
+  try {
+    const state = await readJson(join(operationDir, "state.json"));
+    if (state.phase === "admitted") {
+      try {
+        await verifyAdmittedProjection(state, root, operationDir);
+        if (!state.case_id || !state.route_id) {
+          const request = await readJson(join(operationDir, "request.json"));
+          await atomicJson(join(operationDir, "state.json"), { ...state, case_id: request.case_id, route_id: request.route_id });
+        }
+        return state;
+      } catch {
+        state.phase = "downloaded";
+        await atomicJson(join(operationDir, "state.json"), state);
+      }
+    }
+    if (state.phase !== "downloaded") throw new Error(`admit requires downloaded state, found ${state.phase}`);
   const requestRecord = await readJson(join(operationDir, "request.json"));
   const manifestPath = join(root, "data", "comparison.json");
   const manifest = parseManifest(await readFile(manifestPath, "utf8"));
   ensureId(requestRecord.case_id, REQUIRED_CASES, "case");
   ensureId(requestRecord.route_id, REQUIRED_ROUTES, "route");
   if (requestRecord.prompt_sha256 !== manifest.cases[requestRecord.case_id].prompt.sha256) throw new Error("operation prompt digest does not match the current manifest");
+  if (requestRecord.requested_model !== manifest.routes[requestRecord.route_id].requested_model.id || stableJson(requestRecord.parameters) !== stableJson(manifest.samples[requestRecord.case_id][requestRecord.route_id].parameters)) throw new Error("operation request does not match the current manifest");
   const expectedOperation = operationKey(requestRecord);
   if (expectedOperation !== state.operation_key) throw new Error("operation key does not match its canonical request");
   const rawPath = join(operationDir, state.file);
@@ -583,7 +727,7 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
       nonblank_review: { kind: "human-reviewed", reviewed_on: metadata.reviewed_on },
     },
   };
-  const operationForReceipt = { operation_key: state.operation_key, request_sha256: state.request_sha256, created_at: now() };
+  const operationForReceipt = { operation_key: state.operation_key, request_sha256: state.request_sha256, created_at: state.created_at || now() };
   const receipt = {
     schema_version: 1,
     operation_key: operationForReceipt.operation_key,
@@ -605,9 +749,13 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
   const manifestTemp = `${manifestPath}.tmp-${process.pid}`;
   await writeFile(manifestTemp, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o644 });
   await rename(manifestTemp, manifestPath);
-  const admitted = { phase: "admitted", operation_key: state.operation_key, request_sha256: state.request_sha256, public_sha256: generated.asset.sha256 };
-  await atomicJson(join(operationDir, "state.json"), admitted);
-  return { state: admitted, asset: assetRelative, poster: posterRelative, receipt: receiptRelative };
+    await updateHtmlState(caseId, routeId, root);
+    const admitted = { phase: "admitted", operation_key: state.operation_key, request_sha256: state.request_sha256, case_id: caseId, route_id: routeId, public_sha256: generated.asset.sha256 };
+    await atomicJson(join(operationDir, "state.json"), admitted);
+    return { state: admitted, asset: assetRelative, poster: posterRelative, receipt: receiptRelative };
+  } finally {
+    await release();
+  }
 }
 
 async function commandReserve(args) {
@@ -660,27 +808,32 @@ async function commandImport(args) {
 async function commandAdmit(args) {
   const key = operationKeyFromArgument(args.flags.operation);
   const result = await admitOperation(operationDirectory(key));
-  process.stdout.write(`admitted ${result.asset}\n`);
+  process.stdout.write(result.asset ? `admitted ${result.asset}\n` : `admitted operation ${key}\n`);
 }
 
 async function commandReconcile(args) {
   const key = operationKeyFromArgument(args.flags.operation);
   const dir = operationDirectory(key);
   const statePath = join(dir, "state.json");
-  const state = await readJson(statePath);
-  if (state.phase !== "ambiguous") throw new Error(`reconcile requires ambiguous state, found ${state.phase}`);
-  if (args.flags["remote-job-ref"]) {
-    const next = { phase: "submitted", operation_key: state.operation_key, request_sha256: state.request_sha256, remote_job_ref: String(args.flags["remote-job-ref"]) };
-    await atomicJson(statePath, next);
-    process.stdout.write("reconciled to submitted; rerun run to poll the existing job\n");
-    return;
+  const release = await acquireLock(dir);
+  try {
+    const state = await readJson(statePath);
+    if (!["ambiguous", "submitting"].includes(state.phase)) throw new Error(`reconcile requires an ambiguous submission state, found ${state.phase}`);
+    if (args.flags["remote-job-ref"]) {
+      const next = { phase: "submitted", operation_key: state.operation_key, request_sha256: state.request_sha256, created_at: state.created_at, remote_job_ref: String(args.flags["remote-job-ref"]) };
+      await atomicJson(statePath, next);
+      process.stdout.write("reconciled to submitted; rerun run to poll the existing job\n");
+      return;
+    }
+    if (!args.flags.file) throw new Error("reconcile requires --remote-job-ref or --file");
+    if (state.phase === "ambiguous" || state.phase === "submitting") {
+      await atomicJson(statePath, { ...state, phase: "reserved", reason: undefined });
+    }
+  } finally {
+    await release();
   }
-  if (args.flags.file) {
-    const result = await importFile(dir, args.flags.file, args.flags.poster, {});
-    process.stdout.write(`reconciled to ${result.phase}; admit after review\n`);
-    return;
-  }
-  throw new Error("reconcile requires --remote-job-ref or --file");
+  const result = await importFile(dir, args.flags.file, args.flags.poster, {});
+  process.stdout.write(`reconciled to ${result.phase}; admit after review\n`);
 }
 
 async function main(argv) {

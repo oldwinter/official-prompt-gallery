@@ -75,8 +75,54 @@
           }
         },
         "state": {
-          "kind": "planned",
-          "reason": "awaiting-private-generation-and-review"
+          "kind": "generated",
+          "served_model": {
+            "kind": "operator-verified-local-deployment",
+            "id": "MiniMax-H3",
+            "evidence": "local runtime model check"
+          },
+          "cost": {
+            "kind": "local-compute-not-priced"
+          },
+          "generated_at": "2026-08-29T17:49:47.629Z",
+          "asset": {
+            "sha256": "470999e2a476ddbda58eb003b5685a22b1f61ce0036c74d24de8dc0bc302de2e",
+            "bytes": 810733,
+            "provenance": {
+              "kind": "direct-provider-output"
+            }
+          },
+          "media_facts": {
+            "kind": "video",
+            "container": "mp4",
+            "codec": "h264",
+            "width": 1344,
+            "height": 768,
+            "duration_milliseconds": 5167,
+            "frame_rate_millihertz": 24000,
+            "audio": {
+              "kind": "present",
+              "codec": "aac"
+            },
+            "poster": {
+              "sha256": "a84bb76f8e151602ccf562a1b43e7f9c32d72578f7c9d63a1abd644394ee0a6f",
+              "bytes": 27288,
+              "width": 672,
+              "height": 384
+            }
+          },
+          "receipt_sha256": "31b124ff22748da7e4eb90db37dd38c87b8f671844ca19b0a6f48ebbdd6085f1",
+          "alt_text": "MiniMax-H3 output for the drone dancer prompt.",
+          "admission": {
+            "full_decode": {
+              "tool": "ffprobe",
+              "version": "4.4.2"
+            },
+            "nonblank_review": {
+              "kind": "human-reviewed",
+              "reviewed_on": "2026-08-30"
+            }
+          }
         }
       },
       "grok-video": {
@@ -113,8 +159,54 @@
           }
         },
         "state": {
-          "kind": "planned",
-          "reason": "awaiting-private-generation-and-review"
+          "kind": "generated",
+          "served_model": {
+            "kind": "operator-verified-local-deployment",
+            "id": "MiniMax-H3",
+            "evidence": "local runtime model check"
+          },
+          "cost": {
+            "kind": "local-compute-not-priced"
+          },
+          "generated_at": "2026-08-29T17:49:47.856Z",
+          "asset": {
+            "sha256": "8508a3e80becc3725f4254c972ca303e84270a95e390e7fbf46ba13bf250288e",
+            "bytes": 2007401,
+            "provenance": {
+              "kind": "direct-provider-output"
+            }
+          },
+          "media_facts": {
+            "kind": "video",
+            "container": "mp4",
+            "codec": "h264",
+            "width": 1344,
+            "height": 768,
+            "duration_milliseconds": 5167,
+            "frame_rate_millihertz": 24000,
+            "audio": {
+              "kind": "present",
+              "codec": "aac"
+            },
+            "poster": {
+              "sha256": "62d8825c25e7399ceaa0f11b7672115bc0e909ff372fd4071c588261bc31e9da",
+              "bytes": 19578,
+              "width": 672,
+              "height": 384
+            }
+          },
+          "receipt_sha256": "f6b3606fd784d6b6113f765c46e04c4549cf438e349ea9b4327328e9fb6cfe62",
+          "alt_text": "MiniMax-H3 output for the Mars launch prompt.",
+          "admission": {
+            "full_decode": {
+              "tool": "ffprobe",
+              "version": "4.4.2"
+            },
+            "nonblank_review": {
+              "kind": "human-reviewed",
+              "reviewed_on": "2026-08-30"
+            }
+          }
         }
       },
       "grok-video": {

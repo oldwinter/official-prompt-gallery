@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "operation_key": "03585cfd5323a33b9630f4e9ea2dc9fad0c1b346d6c9a42e18e558c5b2c5d562",
+  "request_sha256": "495c1141391d673e9344d46d733496db82e2c29bf1936588b0baa21fea51a919",
+  "terminal_status": "succeeded",
+  "started_at": "2026-08-29T17:49:47.630Z",
+  "completed_at": "2026-08-29T17:49:47.630Z",
+  "transport": {
+    "status_code": 200,
+    "media_content_type": "video/mp4"
+  },
+  "served_model": {
+    "kind": "operator-verified-local-deployment",
+    "id": "MiniMax-H3",
+    "evidence": "local runtime model check"
+  },
+  "cost": {
+    "kind": "local-compute-not-priced"
+  },
+  "response_media_sha256": "470999e2a476ddbda58eb003b5685a22b1f61ce0036c74d24de8dc0bc302de2e"
+}

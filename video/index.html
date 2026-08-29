@@ -79,16 +79,16 @@
             <p class="live-status" data-video-status role="status" aria-live="polite">Ready for admitted media. Native player controls remain available.</p>
 
             <div class="video-grid">
-              <figure class="video-cell" data-case-id="minimax-official-01" data-route-id="minimax-h3" data-state="planned">
+              <figure class="video-cell" data-case-id="minimax-official-01" data-route-id="minimax-h3" data-state="generated">
                 <div class="media-frame">
-                  <div class="planned-frame" aria-hidden="true"><span class="frame-index">A</span><span>Asset pending admission</span><span class="frame-line"></span></div>
+                  <div class="planned-frame" aria-hidden="true"><span class="frame-index">A</span><span>Admitted output</span><span class="frame-line"></span></div>
                   <video controls playsinline preload="metadata" poster="media/minimax-official-01--minimax-h3.poster.webp" data-video-player data-provider="MiniMax-H3" aria-label="MiniMax-H3 output for the drone dancer prompt">
                     <source src="media/minimax-official-01--minimax-h3.mp4" type="video/mp4">
-                    This MiniMax-H3 video is planned and will appear after private review and admission.
+                    This MiniMax-H3 video is admitted and available with native controls.
                   </video>
                 </div>
                 <figcaption>
-                  <div class="provider-line"><span class="provider-dot provider-dot-red" aria-hidden="true"></span><strong>MiniMax-H3</strong><span class="state-tag">PLANNED</span></div>
+                  <div class="provider-line"><span class="provider-dot provider-dot-red" aria-hidden="true"></span><strong>MiniMax-H3</strong><span class="state-tag">GENERATED</span></div>
                   <p>Local SGLang route · 768 px short edge</p>
                 </figcaption>
                 <details class="facts">
@@ -107,8 +107,7 @@
               <figure class="video-cell" data-case-id="minimax-official-01" data-route-id="grok-video" data-state="planned">
                 <div class="media-frame">
                   <div class="planned-frame" aria-hidden="true"><span class="frame-index">B</span><span>Asset pending admission</span><span class="frame-line"></span></div>
-                  <video controls playsinline preload="metadata" poster="media/minimax-official-01--grok-video.poster.webp" data-video-player data-provider="grok-imagine-video-1.5" aria-label="grok-imagine-video-1.5 output for the drone dancer prompt">
-                    <source src="media/minimax-official-01--grok-video.mp4" type="video/mp4">
+                  <video controls playsinline preload="metadata" poster="assets/planned-video.webp" data-asset-path="media/minimax-official-01--grok-video.mp4" data-poster-path="media/minimax-official-01--grok-video.poster.webp" data-video-player data-provider="grok-imagine-video-1.5" aria-label="grok-imagine-video-1.5 output for the drone dancer prompt">
                     This grok-imagine-video-1.5 video is planned and will appear after private review and admission.
                   </video>
                 </div>
@@ -164,16 +163,16 @@
             <p class="live-status" data-video-status role="status" aria-live="polite">Ready for admitted media. Native player controls remain available.</p>
 
             <div class="video-grid">
-              <figure class="video-cell" data-case-id="xai-official-01" data-route-id="minimax-h3" data-state="planned">
+              <figure class="video-cell" data-case-id="xai-official-01" data-route-id="minimax-h3" data-state="generated">
                 <div class="media-frame">
-                  <div class="planned-frame" aria-hidden="true"><span class="frame-index">A</span><span>Asset pending admission</span><span class="frame-line"></span></div>
+                  <div class="planned-frame" aria-hidden="true"><span class="frame-index">A</span><span>Admitted output</span><span class="frame-line"></span></div>
                   <video controls playsinline preload="metadata" poster="media/xai-official-01--minimax-h3.poster.webp" data-video-player data-provider="MiniMax-H3" aria-label="MiniMax-H3 output for the Mars launch prompt">
                     <source src="media/xai-official-01--minimax-h3.mp4" type="video/mp4">
-                    This MiniMax-H3 video is planned and will appear after private review and admission.
+                    This MiniMax-H3 video is admitted and available with native controls.
                   </video>
                 </div>
                 <figcaption>
-                  <div class="provider-line"><span class="provider-dot provider-dot-red" aria-hidden="true"></span><strong>MiniMax-H3</strong><span class="state-tag">PLANNED</span></div>
+                  <div class="provider-line"><span class="provider-dot provider-dot-red" aria-hidden="true"></span><strong>MiniMax-H3</strong><span class="state-tag">GENERATED</span></div>
                   <p>Local SGLang route · 768 px short edge</p>
                 </figcaption>
                 <details class="facts">
@@ -192,8 +191,7 @@
               <figure class="video-cell" data-case-id="xai-official-01" data-route-id="grok-video" data-state="planned">
                 <div class="media-frame">
                   <div class="planned-frame" aria-hidden="true"><span class="frame-index">B</span><span>Asset pending admission</span><span class="frame-line"></span></div>
-                  <video controls playsinline preload="metadata" poster="media/xai-official-01--grok-video.poster.webp" data-video-player data-provider="grok-imagine-video-1.5" aria-label="grok-imagine-video-1.5 output for the Mars launch prompt">
-                    <source src="media/xai-official-01--grok-video.mp4" type="video/mp4">
+                  <video controls playsinline preload="metadata" poster="assets/planned-video.webp" data-asset-path="media/xai-official-01--grok-video.mp4" data-poster-path="media/xai-official-01--grok-video.poster.webp" data-video-player data-provider="grok-imagine-video-1.5" aria-label="grok-imagine-video-1.5 output for the Mars launch prompt">
                     This grok-imagine-video-1.5 video is planned and will appear after private review and admission.
                   </video>
                 </div>
@@ -241,6 +239,7 @@
             <p>Generation state, raw responses, credentials, and originals remain private. Only reviewed, hashed web derivatives and sanitized receipts enter this repository.</p>
           </div>
         </div>
+        <p class="availability-note">Current release: both MiniMax-H3 cells are admitted. The requested Grok 1.5 cells remain planned because the available private gateway does not expose that exact model.</p>
         <p class="methodology-links"><a class="text-link" href="METHODOLOGY.md">Read methodology <span aria-hidden="true">↗</span></a><a class="text-link" href="DATA_NOTICE.md">Read data notice <span aria-hidden="true">↗</span></a><a class="text-link" href="https://github.com/oldwinter/official-prompt-video-gallery" rel="noreferrer">Source repository <span aria-hidden="true">↗</span></a></p>
       </section>
     </main>

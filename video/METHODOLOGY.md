@@ -35,7 +35,7 @@ without a preference marker.
 Generation occurs outside GitHub Pages. A private operation is reserved before
 transport, and an ambiguous submission is never retried automatically. A
 reviewed MP4 and WebP poster are imported into the ignored work area, decoded,
-hashed, and atomically promoted. If a browser derivative is used to stay below
+hashed, and promoted with per-file atomic writes. If a browser derivative is used to stay below
 the 25 MiB Pages asset limit, the manifest records the source digest and the
 transform tool/version/arguments. Public receipts contain only an allowlisted
 transport status, evidence variants, timestamps, and hashes.

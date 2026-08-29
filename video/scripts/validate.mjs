@@ -41,6 +41,12 @@ function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (isRecord(value)) return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
 function fail(path, message) {
   throw new Error(`${path}: ${message}`);
 }
@@ -420,12 +426,34 @@ function inspectWithFfprobe(absolutePath) {
   }
 }
 
-function validateReceipt(receipt, path, findings) {
+function canonicalOperationKey(manifest, caseId, routeId) {
+  const value = {
+    repository: manifest.repository,
+    media_kind: manifest.media_kind,
+    case_id: caseId,
+    route_id: routeId,
+    prompt_sha256: manifest.cases[caseId].prompt.sha256,
+    requested_model: manifest.routes[routeId].requested_model.id,
+    parameters: manifest.samples[caseId][routeId].parameters,
+  };
+  return sha256(canonicalJson(value));
+}
+
+function validateReceipt(receipt, path, findings, manifest, caseId, routeId) {
   try {
     exactKeys(receipt, ["schema_version", "operation_key", "request_sha256", "terminal_status", "started_at", "completed_at", "transport", "served_model", "cost", "response_media_sha256"], path);
     if (receipt.schema_version !== 1) fail(`${path}.schema_version`, "must be 1");
     hashValue(receipt.operation_key, `${path}.operation_key`);
     hashValue(receipt.request_sha256, `${path}.request_sha256`);
+    const expectedOperation = canonicalOperationKey(manifest, caseId, routeId);
+    const expectedRequest = {
+      model: manifest.routes[routeId].requested_model.id,
+      prompt: manifest.cases[caseId].prompt.text,
+      parameters: manifest.samples[caseId][routeId].parameters,
+    };
+    if (receipt.operation_key !== expectedOperation || receipt.request_sha256 !== sha256(canonicalJson(expectedRequest))) {
+      fail(path, "receipt identity does not match the canonical case and route request");
+    }
     if (receipt.terminal_status !== "succeeded") fail(`${path}.terminal_status`, "must be succeeded");
     instantValue(receipt.started_at, `${path}.started_at`);
     instantValue(receipt.completed_at, `${path}.completed_at`);
@@ -433,6 +461,7 @@ function validateReceipt(receipt, path, findings) {
     integerValue(receipt.transport.status_code, `${path}.transport.status_code`, { min: 200 });
     if (receipt.transport.status_code >= 300) fail(`${path}.transport.status_code`, "must be a successful status");
     stringValue(receipt.transport.media_content_type, `${path}.transport.media_content_type`);
+    if (receipt.transport.media_content_type !== "video/mp4") fail(`${path}.transport.media_content_type`, "must be video/mp4");
     parseServedModel(receipt.served_model, `${path}.served_model`);
     parseCost(receipt.cost, `${path}.cost`);
     hashValue(receipt.response_media_sha256, `${path}.response_media_sha256`);
@@ -454,8 +483,10 @@ function attr(tag, name) {
 export function validateHtmlProjection(html, manifest) {
   const findings = [];
   if (typeof html !== "string") return [{ code: "html", path: "index.html", message: "must be UTF-8 text" }];
+  const visibleHtml = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<script\b[\s\S]*?<\/script>/gi, "").replace(/<style\b[\s\S]*?<\/style>/gi, "");
   const figurePattern = /<figure\b[^>]*data-case-id=["'][^"']+["'][^>]*data-route-id=["'][^"']+["'][^>]*>/gi;
-  const figures = [...html.matchAll(figurePattern)].map((match) => match[0]);
+  const figures = [...visibleHtml.matchAll(figurePattern)].map((match) => match[0]);
+  const blocks = [...visibleHtml.matchAll(/<figure\b[^>]*data-case-id=["'][^"']+["'][^>]*data-route-id=["'][^"']+["'][^>]*>[\s\S]*?<\/figure>/gi)].map((match) => match[0]);
   const figureKeys = figures.map((tag) => `${attr(tag, "data-case-id")}--${attr(tag, "data-route-id")}`);
   const expected = expectedSampleKeys(manifest);
   if (figures.length !== expected.size) findings.push({ code: "html-cell-count", path: "index.html", message: `expected ${expected.size} output figures, found ${figures.length}` });
@@ -463,27 +494,42 @@ export function validateHtmlProjection(html, manifest) {
   for (const key of expected) {
     if (!figureKeys.includes(key)) findings.push({ code: "html-cell-missing", path: "index.html", message: `missing output figure ${key}` });
     const [caseId, routeId] = key.split("--");
+    const figureTag = figures[figureKeys.indexOf(key)] || "";
+    const figureBlock = blocks.find((block) => attr(block, "data-case-id") === caseId && attr(block, "data-route-id") === routeId) || "";
+    const stateMatch = figureTag.match(/data-state=["'](planned|generated)["']/i);
+    const manifestState = manifest.samples[caseId][routeId].state.kind;
+    if (!stateMatch) findings.push({ code: "html-state", path: `index.html:${key}`, message: "output figure must expose planned or generated state" });
+    else if (stateMatch[1].toLowerCase() !== manifestState) findings.push({ code: "html-state", path: `index.html:${key}`, message: `figure state must match manifest (${manifestState})` });
     const media = mediaPath(manifest.media_kind, caseId, routeId);
     const poster = posterPath(caseId, routeId);
-    if (!html.includes(media)) findings.push({ code: "html-media-path", path: "index.html", message: `missing ${media}` });
-    if (!html.includes(poster)) findings.push({ code: "html-poster-path", path: "index.html", message: `missing ${poster}` });
-    if (!html.includes(manifest.routes[routeId].label)) findings.push({ code: "html-model-label", path: "index.html", message: `missing model label ${manifest.routes[routeId].label}` });
+    if (manifestState === "generated") {
+      if (!figureBlock.includes(`<source src="${media}"`)) findings.push({ code: "html-media-path", path: `index.html:${key}`, message: `missing ${media}` });
+      if (!figureBlock.includes(`poster="${poster}"`)) findings.push({ code: "html-poster-path", path: `index.html:${key}`, message: `missing ${poster}` });
+    } else {
+      if (!figureBlock.includes(`data-asset-path="${media}"`)) findings.push({ code: "html-media-path", path: `index.html:${key}`, message: `missing planned asset path ${media}` });
+      if (!figureBlock.includes(`data-poster-path="${poster}"`)) findings.push({ code: "html-poster-path", path: `index.html:${key}`, message: `missing planned poster path ${poster}` });
+    }
+    if (!figureBlock.includes(manifest.routes[routeId].label)) findings.push({ code: "html-model-label", path: `index.html:${key}`, message: `missing model label ${manifest.routes[routeId].label}` });
+    const expectedStatus = manifestState === "generated" ? "GENERATED" : "PLANNED";
+    if (!new RegExp(`<span\\b[^>]*class=["']state-tag["'][^>]*>${expectedStatus}<\\/span>`, "i").test(figureBlock)) findings.push({ code: "html-status", path: `index.html:${key}`, message: `status tag must be ${expectedStatus}` });
+    const expectedNote = manifestState === "generated" ? "Admitted output" : "Asset pending admission";
+    if (!figureBlock.includes(expectedNote)) findings.push({ code: "html-status", path: `index.html:${key}`, message: `media note must include ${expectedNote}` });
   }
   for (const caseId of REQUIRED_CASES) {
     const prompt = manifest.cases[caseId].prompt.text;
     const source = manifest.cases[caseId].source.canonical_url;
-    if (!html.includes(prompt)) findings.push({ code: "html-prompt", path: "index.html", message: `exact prompt for ${caseId} is not visible` });
-    if (!html.includes(source)) findings.push({ code: "html-citation", path: "index.html", message: `citation for ${caseId} is not visible` });
-    if (!html.includes(`data-case-id="${caseId}"`)) findings.push({ code: "html-case-anchor", path: "index.html", message: `case ${caseId} is not represented` });
+    if (!visibleHtml.includes(prompt)) findings.push({ code: "html-prompt", path: "index.html", message: `exact prompt for ${caseId} is not visible` });
+    if (!new RegExp(`<a\\b[^>]*href=["']${source.replace(/[.*+?^${}()|[\\]\\]/g, "\\\\$&")}["']`, "i").test(visibleHtml)) findings.push({ code: "html-citation", path: "index.html", message: `citation link for ${caseId} is not visible` });
+    if (!visibleHtml.includes(`data-case-id="${caseId}"`)) findings.push({ code: "html-case-anchor", path: "index.html", message: `case ${caseId} is not represented` });
   }
-  if (!html.includes("data-video-comparison") || !html.includes("data-video-player")) findings.push({ code: "html-video-anchors", path: "index.html", message: "video comparison anchors are required" });
-  if ((html.match(/<video\b[^>]*\bcontrols\b/gi) ?? []).length !== expected.size) findings.push({ code: "html-native-controls", path: "index.html", message: "each output must retain native video controls" });
-  if (!html.includes("data-case-tabs") || !html.includes("data-case-tab")) findings.push({ code: "html-case-tabs", path: "index.html", message: "prompt case tabs are required" });
-  const firstComparison = html.indexOf("data-video-comparison");
-  const methodology = html.indexOf("id=\"methodology\"");
+  if (!visibleHtml.includes("data-video-comparison") || !visibleHtml.includes("data-video-player")) findings.push({ code: "html-video-anchors", path: "index.html", message: "video comparison anchors are required" });
+  if ((visibleHtml.match(/<video\b[^>]*\bcontrols\b/gi) ?? []).length !== expected.size) findings.push({ code: "html-native-controls", path: "index.html", message: "each output must retain native video controls" });
+  if (!visibleHtml.includes("data-case-tabs") || !visibleHtml.includes("data-case-tab")) findings.push({ code: "html-case-tabs", path: "index.html", message: "prompt case tabs are required" });
+  const firstComparison = visibleHtml.indexOf("data-video-comparison");
+  const methodology = visibleHtml.indexOf("id=\"methodology\"");
   if (firstComparison < 0 || methodology < 0 || methodology < firstComparison) findings.push({ code: "html-order", path: "index.html", message: "comparison must precede methodology" });
-  const lower = html.toLowerCase();
-  if (/<[^>]+(?:data-(?:winner|rank|score|preferred-provider)|(?:class|id|aria-label)=["'][^"']*(?:winner|ranked?|score|preferred-provider)[^"']*)[^>]*>/i.test(html)) {
+  const lower = visibleHtml.toLowerCase();
+  if (/data-(?:winner|rank|score|preferred-provider)/i.test(visibleHtml) || /<(?:winner|rank|score|recommendation)\b/i.test(visibleHtml)) {
     findings.push({ code: "html-ranking-markup", path: "index.html", message: "winner, rank, score, and preferred-provider markup is forbidden" });
   }
   for (const phrase of ["ai-generated", "one sample", "capability-aligned", "not a ranking", "excluded from the code license"]) {
@@ -524,7 +570,7 @@ function compareFfprobe(facts, observed, path, findings) {
   if (facts.audio.kind === "present" && !observed.audioCodec) addFinding(findings, "video-facts", path, "recorded audio presence does not match ffprobe");
 }
 
-function validateGeneratedCell(root, caseId, routeId, state, findings, ffprobeAvailable) {
+function validateGeneratedCell(root, caseId, routeId, state, findings, ffprobeAvailable, manifest) {
   const media = mediaPath("video", caseId, routeId);
   const poster = posterPath(caseId, routeId);
   const receipt = receiptPath(caseId, routeId);
@@ -562,7 +608,7 @@ function validateGeneratedCell(root, caseId, routeId, state, findings, ffprobeAv
     } catch (error) {
       addFinding(findings, "receipt-json", receipt, `invalid JSON (${error.message})`);
     }
-    if (parsed) validateReceipt(parsed, receipt, findings);
+    if (parsed) validateReceipt(parsed, receipt, findings, manifest, caseId, routeId);
   } catch (error) {
     addFinding(findings, "receipt-missing", receipt, error.message);
   }
@@ -663,7 +709,7 @@ export async function validateRepository(root = fileURLToPath(new URL("../", imp
         expectedMediaFiles.add(media);
         expectedMediaFiles.add(poster);
         expectedReceiptFiles.add(receipt);
-        validateGeneratedCell(rootPath, caseId, routeId, cell.state, findings, ffprobeAvailable);
+      validateGeneratedCell(rootPath, caseId, routeId, cell.state, findings, ffprobeAvailable, manifest);
       }
     }
   }
