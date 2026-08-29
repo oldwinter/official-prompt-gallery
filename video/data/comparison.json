@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "repository": "official-prompt-video-gallery",
+  "media_kind": "video",
+  "cases": {
+    "minimax-official-01": {
+      "title": "MiniMax official example",
+      "prompt": {
+        "text": "A tiktok dancer is dancing on a drone, doing flips and tricks.",
+        "sha256": "b57b8eaa4593b1c512901d49e05d746ec3f757cb39fe11187ccdc4569801d1b0"
+      },
+      "source": {
+        "publisher": "MiniMax",
+        "title": "Video generation guide",
+        "canonical_url": "https://platform.minimax.io/docs/guides/video-generation",
+        "accessed_on": "2026-08-30",
+        "location_note": "Prompt example in the official video generation guide."
+      }
+    },
+    "xai-official-01": {
+      "title": "xAI official example",
+      "prompt": {
+        "text": "A glowing crystal-powered rocket launching from the red dunes of Mars, ancient alien ruins lighting up in the background as it soars into a sky full of unfamiliar constellations",
+        "sha256": "4581e2710884924622cf83da86486965c9747b8981ce6dcacd88ef7e16f54e67"
+      },
+      "source": {
+        "publisher": "xAI",
+        "title": "Video generation",
+        "canonical_url": "https://docs.x.ai/developers/model-capabilities/video/generation",
+        "accessed_on": "2026-08-30",
+        "location_note": "Prompt example in the official xAI video generation guide."
+      }
+    }
+  },
+  "routes": {
+    "minimax-h3": {
+      "label": "MiniMax-H3",
+      "provider": "MiniMax",
+      "requested_model": {
+        "kind": "exact-model",
+        "id": "MiniMax-H3"
+      },
+      "execution": {
+        "kind": "local-sglang",
+        "api": "openai-compatible-video",
+        "endpoint_scope": "loopback"
+      }
+    },
+    "grok-video": {
+      "label": "grok-imagine-video-1.5",
+      "provider": "xAI",
+      "requested_model": {
+        "kind": "exact-model",
+        "id": "grok-imagine-video-1.5"
+      },
+      "execution": {
+        "kind": "sub2api",
+        "api": "video-generations"
+      }
+    }
+  },
+  "samples": {
+    "minimax-official-01": {
+      "minimax-h3": {
+        "parameters": {
+          "kind": "video",
+          "duration_seconds": 5,
+          "aspect_ratio": "16:9",
+          "requested_resolution": {
+            "kind": "short-edge-pixels",
+            "pixels": 768
+          },
+          "seed": {
+            "kind": "route-does-not-accept-seed"
+          }
+        },
+        "state": {
+          "kind": "planned",
+          "reason": "awaiting-private-generation-and-review"
+        }
+      },
+      "grok-video": {
+        "parameters": {
+          "kind": "video",
+          "duration_seconds": 5,
+          "aspect_ratio": "16:9",
+          "requested_resolution": {
+            "kind": "provider-preset",
+            "value": "480p"
+          },
+          "seed": {
+            "kind": "provider-assigned-not-exposed"
+          }
+        },
+        "state": {
+          "kind": "planned",
+          "reason": "awaiting-private-generation-and-review"
+        }
+      }
+    },
+    "xai-official-01": {
+      "minimax-h3": {
+        "parameters": {
+          "kind": "video",
+          "duration_seconds": 5,
+          "aspect_ratio": "16:9",
+          "requested_resolution": {
+            "kind": "short-edge-pixels",
+            "pixels": 768
+          },
+          "seed": {
+            "kind": "route-does-not-accept-seed"
+          }
+        },
+        "state": {
+          "kind": "planned",
+          "reason": "awaiting-private-generation-and-review"
+        }
+      },
+      "grok-video": {
+        "parameters": {
+          "kind": "video",
+          "duration_seconds": 5,
+          "aspect_ratio": "16:9",
+          "requested_resolution": {
+            "kind": "provider-preset",
+            "value": "480p"
+          },
+          "seed": {
+            "kind": "provider-assigned-not-exposed"
+          }
+        },
+        "state": {
+          "kind": "planned",
+          "reason": "awaiting-private-generation-and-review"
+        }
+      }
+    }
+  },
+  "disclosure": {
+    "generated_media": "all-cells-ai-generated",
+    "sampling": "one-sample-per-case-route",
+    "inference": "qualitative-only-no-winner",
+    "comparability": "capability-aligned-not-identical",
+    "code_license": "MIT-for-code-only",
+    "prompt_rights": "excluded-from-code-license",
+    "media_rights": "excluded-from-code-license"
+  }
+}
