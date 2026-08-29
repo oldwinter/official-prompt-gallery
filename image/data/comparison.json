@@ -1,0 +1,309 @@
+{
+  "schema_version": 1,
+  "repository": "official-prompt-image-gallery",
+  "media_kind": "image",
+  "cases": {
+    "openai-official-01": {
+      "title": "Veterinarian and baby otter",
+      "prompt": {
+        "text": "A children's book drawing of a veterinarian using a stethoscope to listen to the heartbeat of a baby otter.",
+        "sha256": "95763bcc0d3ddb4d0ebc3483ce545c478c8a5ae8328a936bed7347bc8346ee8f"
+      },
+      "source": {
+        "publisher": "OpenAI",
+        "title": "Image generation | OpenAI API",
+        "canonical_url": "https://developers.openai.com/api/docs/guides/image-generation",
+        "accessed_on": "2026-08-30",
+        "location_note": "Official guide example prompt"
+      }
+    },
+    "xai-official-01": {
+      "title": "London landmark stencil collage",
+      "prompt": {
+        "text": "A collage of London landmarks in a stenciled street-art style",
+        "sha256": "70b48cb09613b050d2be4e3a5eed96762af995d434433402a79576d6a2dad017"
+      },
+      "source": {
+        "publisher": "xAI",
+        "title": "Image Generation | xAI API",
+        "canonical_url": "https://docs.x.ai/developers/model-capabilities/images/generation",
+        "accessed_on": "2026-08-30",
+        "location_note": "Official guide example prompt"
+      }
+    }
+  },
+  "routes": {
+    "codex-image": {
+      "label": "Codex image route",
+      "provider": "OpenAI",
+      "requested_model": {
+        "kind": "model-family",
+        "id": "gpt-image-2"
+      },
+      "execution": {
+        "kind": "codex-image-generation",
+        "entitlement": "codex"
+      }
+    },
+    "grok-image": {
+      "label": "Grok Imagine via Sub2API",
+      "provider": "xAI",
+      "requested_model": {
+        "kind": "exact-model",
+        "id": "grok-imagine-image-2.0"
+      },
+      "execution": {
+        "kind": "sub2api",
+        "api": "image-generations"
+      }
+    }
+  },
+  "samples": {
+    "openai-official-01": {
+      "codex-image": {
+        "state": {
+          "kind": "generated",
+          "request_sha256": "5287dec46981f9f937ba8bd4c0232e01c434edbf74003312ec6503ec5a74c643"
+        },
+        "served_model": {
+          "kind": "not-exposed",
+          "reason": "codex-route-does-not-return-served-snapshot"
+        },
+        "parameters": {
+          "kind": "image",
+          "aspect_ratio": "1:1",
+          "requested_size": {
+            "kind": "pixel-dimensions",
+            "width": 1024,
+            "height": 1024
+          },
+          "quality": {
+            "kind": "requested",
+            "value": "medium"
+          },
+          "seed": {
+            "kind": "route-does-not-accept-seed"
+          }
+        },
+        "cost": {
+          "kind": "included-entitlement-amount-not-exposed"
+        },
+        "generated_at": "2026-08-29T17:55:42.559Z",
+        "asset": {
+          "kind": "public-asset",
+          "sha256": "5a0acef61aa44111e94885f17e5a3167d21f28f7b55c6ecb34da3d035abb87b7",
+          "bytes": 422248,
+          "provenance": {
+            "kind": "web-derivative",
+            "source_sha256": "e6bc7969093c958c7855601c7a8be1bcf4f12575fa6167aabd6190b35f678d46",
+            "transform": {
+              "tool": "ImageMagick",
+              "version": "runtime",
+              "arguments": [
+                "-strip",
+                "-quality",
+                "92",
+                "webp"
+              ]
+            }
+          }
+        },
+        "media_facts": {
+          "kind": "image",
+          "format": "webp",
+          "width": 1313,
+          "height": 1198,
+          "alpha": false
+        },
+        "receipt_sha256": "794e368b7a51311e08040dc9f4264f829203735b118f2c4286c8dba24be39863",
+        "alt_text": "AI-generated children's book scene of a veterinarian listening to a baby otter's heartbeat with a stethoscope.",
+        "admission": {
+          "full_decode": {
+            "tool": "ImageMagick",
+            "version": "7.1.2-30"
+          },
+          "nonblank_review": {
+            "kind": "human-reviewed",
+            "reviewed_on": "2026-08-30"
+          }
+        }
+      },
+      "grok-image": {
+        "state": {
+          "kind": "planned"
+        },
+        "served_model": {
+          "kind": "not-exposed",
+          "reason": "provider-response-omits-model"
+        },
+        "parameters": {
+          "kind": "image",
+          "aspect_ratio": "1:1",
+          "requested_size": {
+            "kind": "pixel-dimensions",
+            "width": 1024,
+            "height": 1024
+          },
+          "quality": {
+            "kind": "requested",
+            "value": "medium"
+          },
+          "seed": {
+            "kind": "provider-assigned-not-exposed"
+          }
+        },
+        "cost": {
+          "kind": "paid-route-amount-not-exposed"
+        },
+        "generated_at": {
+          "kind": "not-generated"
+        },
+        "asset": {
+          "kind": "absent",
+          "reason": "not-generated"
+        },
+        "media_facts": {
+          "kind": "absent",
+          "reason": "not-generated"
+        },
+        "receipt_sha256": {
+          "kind": "absent",
+          "reason": "not-generated"
+        },
+        "alt_text": "AI-generated children's book scene of a veterinarian listening to a baby otter's heartbeat with a stethoscope.",
+        "admission": {
+          "kind": "not-admitted",
+          "reason": "not-generated"
+        }
+      }
+    },
+    "xai-official-01": {
+      "codex-image": {
+        "state": {
+          "kind": "generated",
+          "request_sha256": "47e7b5b3f11803c44a7d3fbe67cffaabd2a4934f435b56bb0f7d9ee7065915c2"
+        },
+        "served_model": {
+          "kind": "not-exposed",
+          "reason": "codex-route-does-not-return-served-snapshot"
+        },
+        "parameters": {
+          "kind": "image",
+          "aspect_ratio": "1:1",
+          "requested_size": {
+            "kind": "pixel-dimensions",
+            "width": 1024,
+            "height": 1024
+          },
+          "quality": {
+            "kind": "requested",
+            "value": "medium"
+          },
+          "seed": {
+            "kind": "route-does-not-accept-seed"
+          }
+        },
+        "cost": {
+          "kind": "included-entitlement-amount-not-exposed"
+        },
+        "generated_at": "2026-08-29T17:55:42.676Z",
+        "asset": {
+          "kind": "public-asset",
+          "sha256": "24163f290b06ede2b7eb83a94a9ec89b1768b59febc0d2401584536951e14f68",
+          "bytes": 839822,
+          "provenance": {
+            "kind": "web-derivative",
+            "source_sha256": "b242c0a26f721760783717d4debf673993472e6730032a321f71df97ead8c836",
+            "transform": {
+              "tool": "ImageMagick",
+              "version": "runtime",
+              "arguments": [
+                "-strip",
+                "-quality",
+                "92",
+                "webp"
+              ]
+            }
+          }
+        },
+        "media_facts": {
+          "kind": "image",
+          "format": "webp",
+          "width": 1536,
+          "height": 1024,
+          "alpha": false
+        },
+        "receipt_sha256": "d2e400a2d44328acac44f18dc836b98fd88f84038ca34a055eadd1444968ef24",
+        "alt_text": "AI-generated collage of London landmarks rendered in a stenciled street-art style.",
+        "admission": {
+          "full_decode": {
+            "tool": "ImageMagick",
+            "version": "7.1.2-30"
+          },
+          "nonblank_review": {
+            "kind": "human-reviewed",
+            "reviewed_on": "2026-08-30"
+          }
+        }
+      },
+      "grok-image": {
+        "state": {
+          "kind": "planned"
+        },
+        "served_model": {
+          "kind": "not-exposed",
+          "reason": "provider-response-omits-model"
+        },
+        "parameters": {
+          "kind": "image",
+          "aspect_ratio": "1:1",
+          "requested_size": {
+            "kind": "pixel-dimensions",
+            "width": 1024,
+            "height": 1024
+          },
+          "quality": {
+            "kind": "requested",
+            "value": "medium"
+          },
+          "seed": {
+            "kind": "provider-assigned-not-exposed"
+          }
+        },
+        "cost": {
+          "kind": "paid-route-amount-not-exposed"
+        },
+        "generated_at": {
+          "kind": "not-generated"
+        },
+        "asset": {
+          "kind": "absent",
+          "reason": "not-generated"
+        },
+        "media_facts": {
+          "kind": "absent",
+          "reason": "not-generated"
+        },
+        "receipt_sha256": {
+          "kind": "absent",
+          "reason": "not-generated"
+        },
+        "alt_text": "AI-generated collage of London landmarks rendered in a stenciled street-art style.",
+        "admission": {
+          "kind": "not-admitted",
+          "reason": "not-generated"
+        }
+      }
+    }
+  },
+  "disclosure": {
+    "generated_media": "All outputs are AI-generated media.",
+    "sampling": "One sample per prompt and route; this is a qualitative inspection set.",
+    "inference": "No winner, score, rank, or recommendation is claimed.",
+    "comparability": "The routes are capability-aligned rather than pixel-identical.",
+    "model_identity": "Requested model names are recorded separately from served identity; the Codex route does not expose a served snapshot.",
+    "code_license": "The code in this repository is licensed under MIT.",
+    "prompt_rights": "Official prompts remain attributed to OpenAI and xAI and are excluded from the code license.",
+    "media_rights": "Generated provider outputs are excluded from the code license; consult each provider's terms before reuse."
+  }
+}

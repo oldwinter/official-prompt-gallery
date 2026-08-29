@@ -1,0 +1,24 @@
+name: Check static gallery
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Check JavaScript syntax
+        run: |
+          node --check assets/image-inspector.js
+          node --check scripts/validate.mjs
+          node --check scripts/capture.mjs
+      - name: Validate authoring projection
+        run: node scripts/validate.mjs --mode authoring
+      - name: Run offline smoke fixture
+        run: node scripts/fixtures/smoke.mjs
