@@ -224,7 +224,7 @@
       if (event.key === 'Escape') {
         event.preventDefault();
         close();
-      } else if (event.target && /^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(event.target.tagName)) {
+      } else if (event.target && /^(INPUT|SELECT|TEXTAREA)$/.test(event.target.tagName)) {
         return;
       } else if (event.key === 'ArrowLeft' && providers.length > 1) {
         event.preventDefault();

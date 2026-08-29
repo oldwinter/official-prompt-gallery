@@ -364,6 +364,10 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function htmlAttribute(tag, name) {
+  return tag.match(new RegExp(`${name}=["']([^"']+)["']`, 'i'))?.[1] || '';
+}
+
 export function validateHtmlProjection(html, manifest) {
   const errors = [];
   if (typeof html !== 'string' || !html.trim()) return [{ code: 'html', path: 'index.html', message: 'HTML is empty' }];
@@ -406,6 +410,10 @@ export function validateHtmlProjection(html, manifest) {
       if (!new RegExp(`alt="${escapeRegExp(sample.alt_text)}"`, 'i').test(body)) errors.push({ code: 'html-alt', path: `index.html:${key}`, message: 'figure alt text differs from manifest' });
       const requestedId = manifest.routes[routeId].requested_model.id;
       if (!body.includes(requestedId)) errors.push({ code: 'html-model', path: `index.html:${key}`, message: 'requested model is not visible' });
+      const imageTag = body.match(/<img\b[^>]*>/i);
+      if (imageTag && sample.state.kind === 'generated') {
+        if (Number(htmlAttribute(imageTag[0], 'width')) !== sample.media_facts.width || Number(htmlAttribute(imageTag[0], 'height')) !== sample.media_facts.height) errors.push({ code: 'html-dimensions', path: `index.html:${key}`, message: 'image dimensions must match the admitted manifest facts' });
+      }
     }
   }
   if (figures.length !== 4 || seen.size !== 4) errors.push({ code: 'html-cross-product', path: 'index.html', message: 'exactly four unique output figures are required' });
