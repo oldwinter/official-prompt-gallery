@@ -11,14 +11,14 @@ ranking. Different requested resolutions and serving paths are disclosed next
 to each output. A missing served-model, seed, or cost field is represented by a
 named evidence variant rather than an invented value.
 
-This release admits the two local H3 outputs. The two requested Grok 1.5 cells
-remain planned because the configured private gateway did not expose that exact
-model; no fallback model is presented as Grok 1.5.
+This release admits all four cells: two local H3 outputs and two Grok 1.5
+cells completed through the private capture flow. Served identity is recorded
+as not exposed where the route omitted a snapshot.
 
 The local route uses MiniMax-H3 through an operator-managed SGLang deployment.
 The H3 model license and attribution remain with the model publisher; see the
 [MiniMax-H3 model card and license](https://huggingface.co/MiniMaxAI/MiniMax-H3).
-No model weights are copied into this repository. The Grok output, if admitted, remains
+No model weights are copied into this repository. The Grok outputs remain
 subject to xAI/Sub2API terms and any applicable account or provider limits.
 
 The MIT `LICENSE` applies to repository code and documentation only. It does
