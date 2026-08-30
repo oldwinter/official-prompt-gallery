@@ -15,14 +15,21 @@ The image repository must point at that exact URL after merge. Do not copy a sec
 
 ## Current measurements
 
-Measured on 2026-08-30T13:01:06Z from the video worktree at `39d50e019b6aa94e1e990167985a44c92779f57f` and the sibling image checkout at `6e40b12c0d1cc34ea10099b91da50081039a8a8e`. One mebibyte is 1,048,576 bytes.
+Measured on 2026-08-30T22:23:10Z from the video evidence-correction
+commit `0e8f592d7f0decb27948f12ff5894b7ac618f66e` and the sibling image
+gallery final main `3749f57942874bf32cb3a0c89524ad27f168b47f`. One mebibyte is
+1,048,576 bytes. The policy-only commit after the video measurement changes
+only this document; re-run the commands below before any threshold decision.
 
 | Gallery | HEAD | Tracked working tree | Admitted media | Largest tracked file |
 | --- | --- | --- | --- | --- |
-| Video | `39d50e0` | 3,017,288 B (2.88 MiB) | 2,865,000 B (2.73 MiB), 4 files | 2,007,401 B (1.91 MiB) `media/xai-official-01--minimax-h3.mp4` |
-| Image | `6e40b12` | 1,420,929 B (1.35 MiB) | 1,262,070 B (1.20 MiB), 2 files | 839,822 B (0.80 MiB) `media/xai-official-01--codex-image.webp` |
+| Video | `0e8f592` | 3,033,185 B (2.89 MiB) | 2,865,000 B (2.73 MiB), 4 files | 2,007,401 B (1.91 MiB) `media/xai-official-01--minimax-h3.mp4` |
+| Image | `3749f57` | 1,424,765 B (1.36 MiB) | 1,262,070 B (1.20 MiB), 2 files | 839,822 B (0.80 MiB) `media/xai-official-01--codex-image.webp` |
 
-All-history blob bytes (every blob reachable from `--all`): video 3,162,300 B (3.02 MiB); image 1,683,096 B (1.60 MiB). The image checkout also tracks a 1-byte `media/.gitkeep`, which is not admitted media.
+All-history blob bytes (every blob reachable from `--all`): video 7,381,620 B
+(7.04 MiB); image 2,553,017 B (2.43 MiB). This includes withdrawn candidate
+assets retained in Git history. The image checkout also tracks a 1-byte
+`media/.gitkeep`, which is not admitted media.
 
 Admitted video files: `media/xai-official-01--minimax-h3.mp4` 2,007,401 B; `media/minimax-official-01--minimax-h3.mp4` 810,733 B; posters 27,288 B and 19,578 B. Admitted image files: `media/xai-official-01--codex-image.webp` 839,822 B; `media/openai-official-01--codex-image.webp` 422,248 B.
 
@@ -30,8 +37,8 @@ Re-run from either repository root:
 
 ```console
 git rev-parse HEAD
-git ls-files -z | xargs -0 stat --printf='%s\t%n\n'
-git ls-files -z -- media | xargs -0 stat --printf='%s\t%n\n'
+git ls-files -z | xargs -0 wc -c
+git ls-files -z -- media | xargs -0 wc -c
 git rev-list --objects --all | git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' | awk '$1=="blob" { n++; s+=$3 } END { print n, s }'
 ```
 
@@ -74,7 +81,8 @@ Local numbers are policy, not GitHub or Cloudflare enforcement.
 | Estimated or observed Pages bandwidth ≥ 20 GB in a month | 20% of the 100 GB soft cap | Warning. |
 | A reviewed original cannot be admitted under 25 MiB, or tracked working tree ≥ 400 MiB, or published-site estimate ≥ 500 MiB, or Pages bandwidth ≥ 50 GB in a month | migrate-threshold | Originals may leave Pages. Browser derivatives that stay under 25 MiB remain on Pages. |
 
-Current trees (2.88 MiB video, 1.35 MiB image) sit far below every warning. Stay on GitHub Pages.
+Current measured trees (2.89 MiB video, 1.36 MiB image) sit far below every
+warning. Stay on GitHub Pages.
 
 ## Owner action and no-migration-before-threshold
 
