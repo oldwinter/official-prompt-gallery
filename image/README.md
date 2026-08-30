@@ -62,3 +62,19 @@ The repository's MIT license covers the code and documentation only. It does
 not grant rights to official prompt text or provider-generated media; those
 remain subject to the relevant source and provider terms. See
 [`METHODOLOGY.md`](METHODOLOGY.md) and [`DATA_NOTICE.md`](DATA_NOTICE.md).
+
+## GitHub Pages
+
+The public site deploys as a static GitHub Pages tree from the repository root.
+`pages.yml` uploads that tree without a build, provider call, or server. Run the
+default validator locally as the strict four-cell publish gate.
+
+This image gallery does not maintain a duplicate hosting policy. Free-hosting
+growth for both public galleries is governed by the canonical
+[hosting policy](https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md)
+in the sibling video repository:
+
+`https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md`
+
+Admitted images remain on GitHub Pages. Originals are not moved to GitHub
+Releases or Cloudflare R2 until a threshold in that policy is actually reached.
