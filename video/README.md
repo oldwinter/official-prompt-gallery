@@ -8,16 +8,19 @@ It compares one sample per prompt and route after private authoring:
 | [MiniMax video generation guide](https://platform.minimax.io/docs/guides/video-generation) | `MiniMax-H3` through loopback SGLang | `grok-imagine-video-1.5` through Sub2API |
 | [xAI video generation guide](https://docs.x.ai/developers/model-capabilities/video/generation) | `MiniMax-H3` through loopback SGLang | `grok-imagine-video-1.5` through Sub2API |
 
-The checked-in ledger has four admitted cells. The public page shows both exact
-prompts, citations, provider labels, and native video controls. Outputs are
+The checked-in ledger has two admitted H3 cells and two `planned` Grok cells.
+The public page shows both exact prompts, citations, provider labels, and native
+video controls so the evidence boundary is visible before every media route is
+admitted. Outputs are
 AI-generated, one sample per case and route, capability-aligned rather than
 pixel-identical, and not a ranking.
 
-The two Grok cells were completed with Grok CLI `/imagine-video`
-(`image_gen` first frame, then `image_to_video`) and admitted through the
-resumable capture flow. Requested identity remains `grok-imagine-video-1.5`;
-served identity is recorded as not exposed because the CLI path does not
-return a served snapshot.
+No fallback Grok model is presented as Video 1.5. One private model catalog
+listed the exact ID but did not expose a video-operation contract. The route
+that produced earlier candidate videos neither listed the exact ID in its
+catalog nor returned served-model identity. Those candidates therefore remain
+unadmitted, and the cells stay `planned` until one approved execution route
+supplies exact-model capability evidence.
 
 ## View and validate
 

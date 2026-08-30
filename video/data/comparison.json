@@ -139,53 +139,8 @@
           }
         },
         "state": {
-          "kind": "generated",
-          "served_model": {
-            "kind": "not-exposed",
-            "reason": "provider-response-omits-model"
-          },
-          "cost": {
-            "kind": "paid-route-amount-not-exposed"
-          },
-          "generated_at": "2026-08-30T06:34:08.106Z",
-          "asset": {
-            "sha256": "4618b198df36dd804de93f8e9a4e3142059398973f162b8bed0bcbae40fbcabe",
-            "bytes": 1892698,
-            "provenance": {
-              "kind": "direct-provider-output"
-            }
-          },
-          "media_facts": {
-            "kind": "video",
-            "container": "mp4",
-            "codec": "h264",
-            "width": 736,
-            "height": 400,
-            "duration_milliseconds": 6042,
-            "frame_rate_millihertz": 24000,
-            "audio": {
-              "kind": "present",
-              "codec": "aac"
-            },
-            "poster": {
-              "sha256": "612850942eb18de66f3b6fc41afe05c5349c3b0eaf551f043bf59681754a9b56",
-              "bytes": 38574,
-              "width": 736,
-              "height": 400
-            }
-          },
-          "receipt_sha256": "65f959a76ad48fbf5c27d8ef4fb67c73268e14e3055a9a0ef6d4743895e51e52",
-          "alt_text": "Grok Imagine video output for the drone dancer prompt.",
-          "admission": {
-            "full_decode": {
-              "tool": "ffprobe",
-              "version": "4.4.2"
-            },
-            "nonblank_review": {
-              "kind": "human-reviewed",
-              "reviewed_on": "2026-08-30"
-            }
-          }
+          "kind": "planned",
+          "reason": "awaiting-private-generation-and-review"
         }
       }
     },
@@ -268,53 +223,8 @@
           }
         },
         "state": {
-          "kind": "generated",
-          "served_model": {
-            "kind": "not-exposed",
-            "reason": "provider-response-omits-model"
-          },
-          "cost": {
-            "kind": "paid-route-amount-not-exposed"
-          },
-          "generated_at": "2026-08-30T06:34:08.237Z",
-          "asset": {
-            "sha256": "0cdbcd88971db3c44098271aebd224836979eaf206c5f439c75c13b5b9c66650",
-            "bytes": 2051617,
-            "provenance": {
-              "kind": "direct-provider-output"
-            }
-          },
-          "media_facts": {
-            "kind": "video",
-            "container": "mp4",
-            "codec": "h264",
-            "width": 736,
-            "height": 400,
-            "duration_milliseconds": 6042,
-            "frame_rate_millihertz": 24000,
-            "audio": {
-              "kind": "present",
-              "codec": "aac"
-            },
-            "poster": {
-              "sha256": "d3592b4d8c225e3ad8da9093ecd9d08e41aa641a5491b493eaece5bada7f397d",
-              "bytes": 57646,
-              "width": 736,
-              "height": 400
-            }
-          },
-          "receipt_sha256": "ca207ac68a34c00f3915a4970a60079514b0536778b2070758f6b38e3fbba0d5",
-          "alt_text": "Grok Imagine video output for the Mars launch prompt.",
-          "admission": {
-            "full_decode": {
-              "tool": "ffprobe",
-              "version": "4.4.2"
-            },
-            "nonblank_review": {
-              "kind": "human-reviewed",
-              "reviewed_on": "2026-08-30"
-            }
-          }
+          "kind": "planned",
+          "reason": "awaiting-private-generation-and-review"
         }
       }
     }

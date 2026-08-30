@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { h3FormData, parseProviderResponse, operationKey } from '../capture.mjs';
-import { parseManifest, validateHtmlProjection } from '../validate.mjs';
+import { hasExactServedModel, parseManifest, validateHtmlProjection } from '../validate.mjs';
 
 const manifest = parseManifest(await readFile(new URL('../../data/comparison.json', import.meta.url), 'utf8'));
 const request = {
@@ -21,6 +21,10 @@ assert.equal(JSON.parse(h3Form.get('extra_body')).task, 't2va');
 assert.equal(parseProviderResponse('grok-video', { status: 'pending', request_id: 'job-1' }).phase, 'pending');
 assert.throws(() => parseProviderResponse('grok-video', { status: 'expired', request_id: 'job-1' }), /terminal failure/);
 assert.throws(() => parseProviderResponse('grok-video', { status: 'unknown', request_id: 'job-1' }), /unknown status/);
+assert.equal(hasExactServedModel(manifest.routes['grok-video'], { kind: 'not-exposed', reason: 'provider-response-omits-model' }), false);
+assert.equal(hasExactServedModel(manifest.routes['grok-video'], { kind: 'provider-reported', id: 'grok-imagine-video-1.0', receipt_field: 'model' }), false);
+assert.equal(hasExactServedModel(manifest.routes['grok-video'], { kind: 'provider-reported', id: 'grok-imagine-video-1.5', receipt_field: 'model' }), true);
+assert.equal(hasExactServedModel(manifest.routes['minimax-h3'], { kind: 'operator-verified-local-deployment', id: 'MiniMax-H3', evidence: 'local runtime model check' }), true);
 
 const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
 assert.deepEqual(validateHtmlProjection(html, manifest), [], 'HTML projection must match the ledger');

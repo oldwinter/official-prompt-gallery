@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import {
   EXPECTED_MODELS,
+  hasExactServedModel,
   REQUIRED_CASES,
   REQUIRED_ROUTES,
   mediaPath,
@@ -689,6 +690,10 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
   const providerEvidence = existsSync(join(operationDir, "provider-evidence.json")) ? await readJson(join(operationDir, "provider-evidence.json")) : {};
   const routeId = requestRecord.route_id;
   const caseId = requestRecord.case_id;
+  const servedModel = defaultGeneratedEvidence(routeId, providerEvidence);
+  if (!hasExactServedModel(manifest.routes[routeId], servedModel)) {
+    throw new Error("exact-model admission requires matching route identity evidence");
+  }
   const assetRelative = mediaPath("video", caseId, routeId);
   const posterRelative = posterPath(caseId, routeId);
   const receiptRelative = `receipts/${caseId}--${routeId}.json`;
@@ -705,7 +710,7 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
   await rename(posterTemp, posterAbsolute);
   const generated = {
     kind: "generated",
-    served_model: defaultGeneratedEvidence(routeId, providerEvidence),
+    served_model: servedModel,
     cost: defaultCost(routeId, providerEvidence),
     generated_at: providerEvidence.completed_at || now(),
     asset: {
