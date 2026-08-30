@@ -34,10 +34,18 @@ made to make those differences disappear.
 Capture state is private under ignored `.work/`. A source image is checked for
 an image signature and dimensions, fully decoded with ImageMagick, and reviewed
 for nonblank content by a person before
-admission. The browser receives a WebP derivative below GitHub Pages' 25 MiB
-per-file limit. Its SHA-256, source hash, and transform arguments are recorded
-in the manifest and receipt. CI checks the admitted bytes and headers offline;
-it does not claim to repeat the human visual review or call a provider.
+admission. The browser receives a WebP derivative below the 25 MiB per-file
+admission guard. Its SHA-256, source hash, and transform arguments are recorded
+in the manifest and receipt. That 25 MiB guard is the local hard limit aligned
+with GitHub's documented browser-upload cap; GitHub Pages itself publishes a
+1 GB site cap and a 100 GB/month soft bandwidth cap, not a separate per-file
+Pages byte limit. See the canonical
+[hosting policy](https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md)
+for measured sizes, documented GitHub and Cloudflare limits, local review
+thresholds, and the no-migration-before-threshold rule. This image gallery
+does not maintain a duplicate policy. Public media stays on GitHub Pages. CI
+checks the admitted bytes and headers offline; it does not claim to repeat the
+human visual review or call a provider.
 
 ## Reproducibility boundary
 
