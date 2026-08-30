@@ -6,6 +6,7 @@ import { execFile as execFileCallback } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
   canonicalJson,
+  hasExactServedModel,
   inspectImageHeader,
   mediaPath,
   parseManifest,
@@ -704,6 +705,9 @@ export async function admitOperation(operationPath, repositoryRoot = REPOSITORY_
     const expectedRequest = requestFor(manifest, state.case_id, state.route_id);
     if (operationKey(expectedRequest) !== state.request_sha256) throw new Error('operation key does not match the current manifest request');
     if (manifest.samples[state.case_id][state.route_id].state.kind !== 'planned') throw new Error('manifest cell is no longer planned for this operation');
+    if (!hasExactServedModel(manifest.routes[state.route_id], state.served_model)) {
+      throw new Error('exact-model admission requires matching provider-reported served identity');
+    }
     const sourcePath = sourcePathFromState(directory, state);
     const sourceBytes = await fs.readFile(sourcePath);
     const sourceHeader = inspectImageHeader(sourceBytes);
