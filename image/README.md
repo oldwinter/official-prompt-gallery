@@ -13,14 +13,20 @@ The comparison is deliberately small and honest:
 - capability-aligned requests, not pixel-identical conditions;
 - no winner, score, rank, or recommendation.
 
-All admitted media is AI-generated; the current checkout has four admitted
-cells. The Codex image route requests the `gpt-image-2` family through a
-private Codex entitlement path. The second route requests
-`grok-imagine-image-2.0`; those two cells were completed with Grok CLI
-`/imagine` (`image_gen`) and admitted through the same capture flow. The route
-records requested identity separately from served identity; neither route
-exposes a served snapshot, so the manifest says exactly that rather than
-guessing.
+All admitted media is AI-generated; the current checkout has two admitted Codex
+outputs and two planned Grok cells. The Codex image route requests the
+`gpt-image-2` family through a private Codex entitlement path. The second route
+is intended to request `grok-imagine-image-2.0` through a private Sub2API
+endpoint. Requested identity is recorded separately from served identity; the
+Codex route does not expose a served snapshot, so the manifest says exactly
+that rather than guessing.
+
+No fallback Grok model is presented as Image 2.0. One private model catalog
+listed the exact ID but did not expose an image-operation contract. The route
+that produced earlier candidate images neither listed the exact ID in its
+catalog nor returned served-model identity. Those candidates therefore remain
+unadmitted, and the cells stay `planned` until one approved execution route
+supplies exact-model capability evidence.
 
 ## Validate
 

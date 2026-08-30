@@ -13,13 +13,19 @@ the SHA-256 of each prompt so punctuation and spacing changes are visible.
 
 ## Request matrix
 
-Each prompt is requested once through each route: the private Codex image
-entitlement requesting `gpt-image-2`, and the private Sub2API route requesting
-`grok-imagine-image-2.0`. Both requests use a 1:1 aspect ratio,
+The matrix specifies one request per prompt and route: the private Codex image
+entitlement requesting `gpt-image-2`, and a private Sub2API route intended to
+request `grok-imagine-image-2.0`. Both planned Grok requests use a 1:1 aspect ratio,
 1024 × 1024 output, and medium quality where the route accepts that field.
 Seed behavior is recorded as an explicit evidence variant. A route that does
 not expose a served snapshot or exact cost is labelled as such; no identity or
 price is inferred from the requested model name.
+
+Admission of an exact-model cell requires evidence from the same execution
+route: either a capability response that binds the exact model ID to the image
+operation or a terminal response that reports the exact served model. A model
+catalog from one route cannot establish the identity of bytes returned by a
+different route.
 
 ## What the sample means
 

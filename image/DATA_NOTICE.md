@@ -12,10 +12,10 @@ There is one sample per case and route. The set is qualitative and
 capability-aligned rather than pixel-identical; it is not a ranking and does
 not identify a winner.
 
-This release admits all four cells: two Codex-routed GPT Image 2 requests and
-two Grok Imagine Image 2.0 requests completed through the private capture
-flow. Served identity is recorded as not exposed where the route omitted a
-snapshot.
+This release admits the two Codex-routed GPT Image 2 requests. The two requested
+Grok Image 2.0 cells remain planned because no single approved execution route
+has both exact-model capability evidence and attributable result bytes; no
+fallback or unverified output is presented as Image 2.0.
 
 The code and documentation are licensed under MIT (see `LICENSE`). That code
 license does not grant rights to the quoted prompt text or generated media.

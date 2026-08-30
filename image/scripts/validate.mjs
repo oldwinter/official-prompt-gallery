@@ -145,6 +145,11 @@ export function requestDigest(manifest, caseId, routeId) {
   return sha256(canonicalJson(canonicalRequest(manifest, caseId, routeId)));
 }
 
+export function hasExactServedModel(route, servedModel) {
+  if (route?.requested_model?.kind !== 'exact-model') return true;
+  return servedModel?.kind === 'provider-reported' && servedModel.id === route.requested_model.id;
+}
+
 export function parseManifest(raw) {
   let parsed;
   try {
@@ -247,6 +252,9 @@ function validateSample(sample, manifest, caseId, routeId, location, errors) {
   if (!isPlainObject(sample.parameters.seed) || !seedKinds.includes(sample.parameters.seed.kind) || Object.keys(sample.parameters.seed).length !== 1) errors.push({ code: 'seed', path: `${location}.parameters.seed`, message: 'must use an explicit seed evidence variant' });
 
   validateServedModel(sample.served_model, routeId, `${location}.served_model`, errors);
+  if (sample.state?.kind === 'generated' && !hasExactServedModel(manifest.routes[routeId], sample.served_model)) {
+    errors.push({ code: 'exact-model-evidence', path: `${location}.served_model`, message: 'generated exact-model cells require matching provider-reported served identity' });
+  }
   validateCost(sample.cost, routeId, `${location}.cost`, errors);
   if (typeof sample.alt_text !== 'string' || !sample.alt_text.trim()) errors.push({ code: 'alt-text', path: `${location}.alt_text`, message: 'must be non-empty' });
   validateStateAndEvidence(sample, manifest, caseId, routeId, location, errors);
@@ -509,6 +517,9 @@ function validateReceipt(receipt, sample, routeId, location, errors, manifest, c
   if (receipt.terminal_status !== 'succeeded' || !isIsoInstant(receipt.started_at) || !isIsoInstant(receipt.completed_at)) errors.push({ code: 'receipt', path: location, message: 'receipt must describe a succeeded UTC operation' });
   if (!isPlainObject(receipt.transport) || !exactKeys(receipt.transport, ['status_code', 'media_content_type'], `${location}.transport`, errors) || !Number.isInteger(receipt.transport.status_code) || receipt.transport.status_code < 200 || receipt.transport.status_code >= 400 || typeof receipt.transport.media_content_type !== 'string' || !/^image\/(?:png|jpe?g|webp)$/i.test(receipt.transport.media_content_type)) errors.push({ code: 'receipt-transport', path: `${location}.transport`, message: 'transport evidence is incomplete or unsafe' });
   validateServedModel(receipt.served_model, routeId, `${location}.served_model`, errors);
+  if (!hasExactServedModel(manifest.routes[routeId], receipt.served_model)) {
+    errors.push({ code: 'exact-model-evidence', path: `${location}.served_model`, message: 'exact-model receipts require matching provider-reported served identity' });
+  }
   validateCost(receipt.cost, routeId, `${location}.cost`, errors);
   if (!isSha256(receipt.response_media_sha256)) errors.push({ code: 'receipt-media', path: `${location}.response_media_sha256`, message: 'must be a media SHA-256' });
   if (isSha256(receipt.response_media_sha256) && sample.asset?.provenance?.kind === 'web-derivative' && receipt.response_media_sha256 !== sample.asset.provenance.source_sha256) errors.push({ code: 'receipt-media', path: `${location}.response_media_sha256`, message: 'does not match derivative source hash' });
