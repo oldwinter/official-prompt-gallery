@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "operation_key": "3a92ae9de3f2e9ceaacd5c358ebbefd14cc8e7ed920d083973a2e1dee647a58e",
+  "request_sha256": "3a92ae9de3f2e9ceaacd5c358ebbefd14cc8e7ed920d083973a2e1dee647a58e",
+  "terminal_status": "succeeded",
+  "started_at": "2026-08-30T06:33:55.079Z",
+  "completed_at": "2026-08-30T06:33:55.708Z",
+  "transport": {
+    "status_code": 200,
+    "media_content_type": "image/jpeg"
+  },
+  "served_model": {
+    "kind": "not-exposed",
+    "reason": "provider-response-omits-model"
+  },
+  "cost": {
+    "kind": "paid-route-amount-not-exposed"
+  },
+  "response_media_sha256": "8ca13acb14234e7bb24734f552a7de66bee593eb6ba4dc8887318dcdf7dd0618"
+}

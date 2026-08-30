@@ -102,19 +102,19 @@
               </details>
             </figure>
 
-            <figure class="output-card output-card-amber" data-case-id="openai-official-01" data-route-id="grok-image" data-state="planned">
+            <figure class="output-card output-card-amber" data-case-id="openai-official-01" data-route-id="grok-image" data-state="generated">
               <header class="output-header">
                 <div>
                   <p class="route-index">ROUTE B / xAI</p>
                   <h4>Grok Imagine via Sub2API</h4>
                 </div>
-                <span class="status-tag">PLANNED</span>
+                <span class="status-tag">GENERATED</span>
               </header>
               <div class="image-frame" data-image-frame>
-                <div class="asset-link" data-asset-path="media/openai-official-01--grok-image.webp">
-                  <img src="assets/planned-image.webp" width="1024" height="1024" alt="AI-generated children's book scene of a veterinarian listening to a baby otter's heartbeat with a stethoscope." loading="eager" decoding="async" data-image>
-                </div>
-                <p class="planned-note">Awaiting admitted output</p>
+                <a class="asset-link" href="media/openai-official-01--grok-image.webp" aria-label="Open Grok Imagine image route output for the veterinarian and baby otter prompt">
+                  <img src="media/openai-official-01--grok-image.webp" width="1024" height="1024" alt="AI-generated children's book scene of a veterinarian listening to a baby otter's heartbeat with a stethoscope." loading="eager" decoding="async" data-image>
+                </a>
+                <p class="planned-note">Admitted output</p>
               </div>
               <figcaption>
                 <div class="caption-row"><span>Requested</span><strong>grok-imagine-image-2.0</strong></div>
@@ -126,10 +126,11 @@
                 <dl class="facts-list">
                   <div><dt>Route</dt><dd>Private Sub2API image-generation route</dd></div>
                   <div><dt>Requested size</dt><dd>1024 × 1024</dd></div>
+                  <div><dt>Admitted pixels</dt><dd>1024 × 1024</dd></div>
                   <div><dt>Quality</dt><dd>Medium requested where accepted</dd></div>
                   <div><dt>Cost</dt><dd>Paid route; amount not exposed</dd></div>
                   <div><dt>Seed</dt><dd>Provider-assigned; not exposed</dd></div>
-                  <div><dt>Admission</dt><dd>Planned; no public bytes yet</dd></div>
+                  <div><dt>Admission</dt><dd>Admitted; public bytes available</dd></div>
                 </dl>
               </details>
             </figure>
@@ -186,19 +187,19 @@
               </details>
             </figure>
 
-            <figure class="output-card output-card-amber" data-case-id="xai-official-01" data-route-id="grok-image" data-state="planned">
+            <figure class="output-card output-card-amber" data-case-id="xai-official-01" data-route-id="grok-image" data-state="generated">
               <header class="output-header">
                 <div>
                   <p class="route-index">ROUTE B / xAI</p>
                   <h4>Grok Imagine via Sub2API</h4>
                 </div>
-                <span class="status-tag">PLANNED</span>
+                <span class="status-tag">GENERATED</span>
               </header>
               <div class="image-frame" data-image-frame>
-                <div class="asset-link" data-asset-path="media/xai-official-01--grok-image.webp">
-                  <img src="assets/planned-image.webp" width="1024" height="1024" alt="AI-generated collage of London landmarks rendered in a stenciled street-art style." loading="lazy" decoding="async" data-image>
-                </div>
-                <p class="planned-note">Awaiting admitted output</p>
+                <a class="asset-link" href="media/xai-official-01--grok-image.webp" aria-label="Open Grok Imagine image route output for the London landmark prompt">
+                  <img src="media/xai-official-01--grok-image.webp" width="1024" height="1024" alt="AI-generated collage of London landmarks rendered in a stenciled street-art style." loading="lazy" decoding="async" data-image>
+                </a>
+                <p class="planned-note">Admitted output</p>
               </div>
               <figcaption>
                 <div class="caption-row"><span>Requested</span><strong>grok-imagine-image-2.0</strong></div>
@@ -210,10 +211,11 @@
                 <dl class="facts-list">
                   <div><dt>Route</dt><dd>Private Sub2API image-generation route</dd></div>
                   <div><dt>Requested size</dt><dd>1024 × 1024</dd></div>
+                  <div><dt>Admitted pixels</dt><dd>1024 × 1024</dd></div>
                   <div><dt>Quality</dt><dd>Medium requested where accepted</dd></div>
                   <div><dt>Cost</dt><dd>Paid route; amount not exposed</dd></div>
                   <div><dt>Seed</dt><dd>Provider-assigned; not exposed</dd></div>
-                  <div><dt>Admission</dt><dd>Planned; no public bytes yet</dd></div>
+                  <div><dt>Admission</dt><dd>Admitted; public bytes available</dd></div>
                 </dl>
               </details>
             </figure>
@@ -239,7 +241,7 @@
         <article class="note-block"><p class="note-number">B</p><h3>Explicit identity</h3><p>Requested model and served identity are separate facts. When a route does not expose a snapshot, the record says so.</p></article>
         <article class="note-block"><p class="note-number">C</p><h3>Small sample</h3><p>One output per case and route supports close looking only. The routes are capability-aligned, not pixel-identical.</p></article>
       </div>
-      <p class="availability-note">Current release: the two Codex GPT Image 2 requests are admitted. The requested Grok Image 2.0 cells remain planned because the available private gateway rejects that exact model.</p>
+      <p class="availability-note">Current release: all four cells are admitted. Codex GPT Image 2 and Grok Imagine Image 2.0 each have one sample per official prompt. Served identity is recorded as not exposed where the route omitted a snapshot.</p>
     </section>
 
     <section class="resources" aria-labelledby="resources-heading">

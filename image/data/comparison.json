@@ -130,7 +130,8 @@
       },
       "grok-image": {
         "state": {
-          "kind": "planned"
+          "kind": "generated",
+          "request_sha256": "ee0e148c91973812255420d0e71c5ce9d000ee0395d61bb93118b3b6a2e441af"
         },
         "served_model": {
           "kind": "not-exposed",
@@ -155,25 +156,44 @@
         "cost": {
           "kind": "paid-route-amount-not-exposed"
         },
-        "generated_at": {
-          "kind": "not-generated"
-        },
+        "generated_at": "2026-08-30T06:33:55.130Z",
         "asset": {
-          "kind": "absent",
-          "reason": "not-generated"
+          "kind": "public-asset",
+          "sha256": "e1e815e4c96ed397bd68a089df3249d48c50a055eabf4a93fc91739be3a60d57",
+          "bytes": 308102,
+          "provenance": {
+            "kind": "web-derivative",
+            "source_sha256": "406fd08bc7f15d6b1fd57f3cc1706c41fc2fe643eb0967a95da18397ed9d70f4",
+            "transform": {
+              "tool": "ImageMagick",
+              "version": "runtime",
+              "arguments": [
+                "-strip",
+                "-quality",
+                "92",
+                "webp"
+              ]
+            }
+          }
         },
         "media_facts": {
-          "kind": "absent",
-          "reason": "not-generated"
+          "kind": "image",
+          "format": "webp",
+          "width": 1024,
+          "height": 1024,
+          "alpha": false
         },
-        "receipt_sha256": {
-          "kind": "absent",
-          "reason": "not-generated"
-        },
+        "receipt_sha256": "10e5a5f633c114951e88f9b152c1d76ddd99aa1ff7cace400560fbc0dc6b5e91",
         "alt_text": "AI-generated children's book scene of a veterinarian listening to a baby otter's heartbeat with a stethoscope.",
         "admission": {
-          "kind": "not-admitted",
-          "reason": "not-generated"
+          "full_decode": {
+            "tool": "ImageMagick",
+            "version": "7.1.2-30"
+          },
+          "nonblank_review": {
+            "kind": "human-reviewed",
+            "reviewed_on": "2026-08-30"
+          }
         }
       }
     },
@@ -248,7 +268,8 @@
       },
       "grok-image": {
         "state": {
-          "kind": "planned"
+          "kind": "generated",
+          "request_sha256": "3a92ae9de3f2e9ceaacd5c358ebbefd14cc8e7ed920d083973a2e1dee647a58e"
         },
         "served_model": {
           "kind": "not-exposed",
@@ -273,25 +294,44 @@
         "cost": {
           "kind": "paid-route-amount-not-exposed"
         },
-        "generated_at": {
-          "kind": "not-generated"
-        },
+        "generated_at": "2026-08-30T06:33:55.198Z",
         "asset": {
-          "kind": "absent",
-          "reason": "not-generated"
+          "kind": "public-asset",
+          "sha256": "5cd9ff29fc2adef46d301bd2a7c7ce732229b6538e7b2eeb6f7fcb7a001b18d9",
+          "bytes": 390894,
+          "provenance": {
+            "kind": "web-derivative",
+            "source_sha256": "8ca13acb14234e7bb24734f552a7de66bee593eb6ba4dc8887318dcdf7dd0618",
+            "transform": {
+              "tool": "ImageMagick",
+              "version": "runtime",
+              "arguments": [
+                "-strip",
+                "-quality",
+                "92",
+                "webp"
+              ]
+            }
+          }
         },
         "media_facts": {
-          "kind": "absent",
-          "reason": "not-generated"
+          "kind": "image",
+          "format": "webp",
+          "width": 1024,
+          "height": 1024,
+          "alpha": false
         },
-        "receipt_sha256": {
-          "kind": "absent",
-          "reason": "not-generated"
-        },
+        "receipt_sha256": "5f3d3681f4432e7c7aeb1a0a2a54b834a1497d260caa06e49ac684e4a7fa2e24",
         "alt_text": "AI-generated collage of London landmarks rendered in a stenciled street-art style.",
         "admission": {
-          "kind": "not-admitted",
-          "reason": "not-generated"
+          "full_decode": {
+            "tool": "ImageMagick",
+            "version": "7.1.2-30"
+          },
+          "nonblank_review": {
+            "kind": "human-reviewed",
+            "reviewed_on": "2026-08-30"
+          }
         }
       }
     }

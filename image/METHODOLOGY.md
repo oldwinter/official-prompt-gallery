@@ -15,7 +15,7 @@ the SHA-256 of each prompt so punctuation and spacing changes are visible.
 
 Each prompt is requested once through each route: the private Codex image
 entitlement requesting `gpt-image-2`, and the private Sub2API route requesting
-`grok-imagine-image-2.0`. Both planned requests use a 1:1 aspect ratio,
+`grok-imagine-image-2.0`. Both requests use a 1:1 aspect ratio,
 1024 × 1024 output, and medium quality where the route accepts that field.
 Seed behavior is recorded as an explicit evidence variant. A route that does
 not expose a served snapshot or exact cost is labelled as such; no identity or
