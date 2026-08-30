@@ -317,6 +317,15 @@ function parseDisclosure(value, path) {
   }
 }
 
+export function hasExactServedModel(route, servedModel) {
+  const requestedId = route?.requested_model?.id;
+  if (!requestedId) return false;
+  if (servedModel?.kind === "provider-reported") return servedModel.id === requestedId;
+  return route.execution?.kind === "local-sglang"
+    && servedModel?.kind === "operator-verified-local-deployment"
+    && servedModel.id === requestedId;
+}
+
 /** Parse and structurally validate the public ledger. */
 export function parseManifest(raw) {
   let manifest = raw;
@@ -344,7 +353,13 @@ export function parseManifest(raw) {
   exactKeys(manifest.samples, REQUIRED_CASES, "manifest.samples");
   for (const caseId of REQUIRED_CASES) {
     exactKeys(manifest.samples[caseId], REQUIRED_ROUTES, `manifest.samples.${caseId}`);
-    for (const routeId of REQUIRED_ROUTES) parseCell(manifest.samples[caseId][routeId], `manifest.samples.${caseId}.${routeId}`);
+    for (const routeId of REQUIRED_ROUTES) {
+      const cell = manifest.samples[caseId][routeId];
+      parseCell(cell, `manifest.samples.${caseId}.${routeId}`);
+      if (cell.state.kind === "generated" && !hasExactServedModel(manifest.routes[routeId], cell.state.served_model)) {
+        fail(`manifest.samples.${caseId}.${routeId}.state.served_model`, "generated exact-model cells require matching route identity evidence");
+      }
+    }
   }
   parseDisclosure(manifest.disclosure, "manifest.disclosure");
   return manifest;
@@ -463,6 +478,9 @@ function validateReceipt(receipt, path, findings, manifest, caseId, routeId) {
     stringValue(receipt.transport.media_content_type, `${path}.transport.media_content_type`);
     if (receipt.transport.media_content_type !== "video/mp4") fail(`${path}.transport.media_content_type`, "must be video/mp4");
     parseServedModel(receipt.served_model, `${path}.served_model`);
+    if (!hasExactServedModel(manifest.routes[routeId], receipt.served_model)) {
+      fail(`${path}.served_model`, "exact-model receipts require matching route identity evidence");
+    }
     parseCost(receipt.cost, `${path}.cost`);
     hashValue(receipt.response_media_sha256, `${path}.response_media_sha256`);
     const serialized = JSON.stringify(receipt);

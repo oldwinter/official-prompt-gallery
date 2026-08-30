@@ -22,6 +22,13 @@ Both routes request 5 seconds and a 16:9 aspect ratio. The resolution profiles,
 serving infrastructure, codecs, and response metadata can differ. This is a
 capability-aligned comparison, not a pixel-identical or frame-matched test.
 
+Admission of an exact-model cell requires evidence from the same execution
+route: either a capability response that binds the exact model ID to the video
+operation or a terminal response that reports the exact served model. A model
+catalog from one route cannot establish the identity of bytes returned by a
+different route. The current public schema implements the conservative
+terminal-response gate; a future capability receipt must be added explicitly.
+
 ## Sampling and interpretation
 
 There is one sample for each of the two prompts on each route: four cells in
