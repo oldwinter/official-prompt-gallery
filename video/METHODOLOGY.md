@@ -36,9 +36,17 @@ Generation occurs outside GitHub Pages. A private operation is reserved before
 transport, and an ambiguous submission is never retried automatically. A
 reviewed MP4 and WebP poster are imported into the ignored work area, decoded,
 hashed, and promoted with per-file atomic writes. If a browser derivative is used to stay below
-the 25 MiB Pages asset limit, the manifest records the source digest and the
-transform tool/version/arguments. Public receipts contain only an allowlisted
-transport status, evidence variants, timestamps, and hashes.
+the 25 MiB per-file admission guard, the manifest records the source digest and the
+transform tool/version/arguments. That 25 MiB guard is the local hard limit
+aligned with GitHub's documented browser-upload cap; GitHub Pages itself
+publishes a 1 GB site cap and a 100 GB/month soft bandwidth cap, not a separate
+per-file Pages byte limit. See [docs/hosting-policy.md](docs/hosting-policy.md)
+for measured sizes, documented GitHub and Cloudflare limits, local review
+thresholds, and the no-migration-before-threshold rule that also binds the
+sibling image gallery. After merge, the image repository must cite
+`https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md`.
+Public receipts contain only an allowlisted transport status, evidence
+variants, timestamps, and hashes.
 
 Full decode and a nonblank human review are authoring evidence. CI independently
 checks the checked-in bytes, signatures, sizes, hashes, and recorded facts; it

@@ -78,3 +78,13 @@ same static tree while allowing clearly marked planned cells, then uploads the
 repository root as a Pages artifact; it does not build, call a provider, install
 packages, or require a server. Run the default validator locally as the strict
 four-cell publish gate.
+
+Free-hosting growth for this gallery and the sibling image gallery is governed
+by the canonical [hosting policy](docs/hosting-policy.md). After that document
+is merged to `main`, [official-prompt-image-gallery](https://github.com/oldwinter/official-prompt-image-gallery)
+must point to the same policy URL:
+
+`https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md`
+
+No originals are moved to GitHub Releases or Cloudflare R2 until a threshold in
+that policy is actually reached.
