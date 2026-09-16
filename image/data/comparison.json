@@ -170,7 +170,7 @@
           "kind": "absent",
           "reason": "not-generated"
         },
-        "alt_text": "AI-generated children's book scene of a veterinarian listening to a baby otter's heartbeat with a stethoscope.",
+        "alt_text": "Placeholder for the planned veterinarian and baby otter Grok cell; no admitted public bytes yet.",
         "admission": {
           "kind": "not-admitted",
           "reason": "not-generated"
@@ -288,7 +288,7 @@
           "kind": "absent",
           "reason": "not-generated"
         },
-        "alt_text": "AI-generated collage of London landmarks rendered in a stenciled street-art style.",
+        "alt_text": "Placeholder for the planned London landmarks Grok cell; no admitted public bytes yet.",
         "admission": {
           "kind": "not-admitted",
           "reason": "not-generated"
