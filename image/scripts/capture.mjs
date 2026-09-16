@@ -857,6 +857,7 @@ if (import.meta.url === invokedPath) {
     await main(process.argv.slice(2));
   } catch (error) {
     console.error(`capture error: ${error.message}`);
+    console.error('See: node scripts/capture.mjs --help');
     process.exitCode = 1;
   }
 }
