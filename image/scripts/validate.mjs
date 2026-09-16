@@ -625,6 +625,9 @@ function printReport(report) {
   if (report.errors.length) {
     report.errors.forEach((finding) => console.log(`ERROR ${finding.code} ${finding.path}: ${finding.message}`));
     console.log(`summary: ${report.errors.length} error(s)`);
+    if (report.mode === 'publish' && report.plannedCount > 0) {
+      console.log('next: node scripts/validate.mjs --mode authoring');
+    }
   } else {
     console.log('summary: 0 errors');
   }
