@@ -54,10 +54,17 @@ node scripts/capture.mjs admit --operation .work/operations/OPERATION_KEY --revi
 ```
 
 The Grok route supports the same resumable `reserve` and `run` commands with
-`GROK_BASE_URL` and `GROK_API_KEY`. Use `--dry-run` to inspect the sanitized
-request shape without writing state or contacting a provider. An ambiguous
-submission is held until `reconcile`; rerunning never silently authorizes a
-second paid request.
+`GROK_BASE_URL` and `GROK_API_KEY`. Planned Grok cells use `--route grok-image`.
+Use `--dry-run` to inspect the sanitized request shape without writing state or
+contacting a provider:
+
+```console
+node scripts/capture.mjs reserve --case openai-official-01 --route grok-image --dry-run
+node scripts/capture.mjs reserve --case xai-official-01 --route grok-image --dry-run
+```
+
+An ambiguous submission is held until `reconcile`; rerunning never silently
+authorizes a second paid request.
 
 ## Provenance and licensing
 
