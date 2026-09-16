@@ -766,5 +766,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (mode === "fixture") process.stdout.write("fixture mode: structural authoring checks\n");
   for (const finding of report.findings) process.stdout.write(`${finding.code} ${finding.path}: ${finding.message}\n`);
   process.stdout.write(`${report.ok ? "PASS" : "FAIL"} mode=${mode} planned=${report.planned} generated=${report.generated}${report.ffprobe_checked ? " ffprobe=checked" : ""}\n`);
+  if (!report.ok && mode === "publish" && report.planned > 0) {
+    process.stdout.write("next: this checkout still has planned cells; run `node scripts/validate.mjs --mode authoring`\n");
+  }
   process.exitCode = report.ok ? 0 : 1;
 }

@@ -33,6 +33,9 @@ node scripts/validate.mjs --mode fixture
 node scripts/validate.mjs                 # publish gate; fails while cells are planned
 ```
 
+This checkout still has planned Grok cells, so the default publish command
+fails. Use `--mode authoring` until all four cells are admitted.
+
 Authoring mode validates the complete two-by-two plan and every admitted file.
 Fixture mode is an offline structural check for a planned checkout. Publish
 mode requires all four generated cells, hashes, receipts, media signatures,
