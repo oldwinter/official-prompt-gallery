@@ -26,3 +26,5 @@ jobs:
         run: node scripts/validate.mjs --mode authoring
       - name: Run offline smoke fixture
         run: node scripts/fixtures/smoke.mjs
+      - name: CLI next-step tests
+        run: python3 -m unittest discover -s test -p 'test_*.py' -v

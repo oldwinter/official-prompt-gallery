@@ -24,14 +24,27 @@ supplies exact-model capability evidence.
 
 ## View and validate
 
-The site is dependency-free. Open `index.html` locally or serve the repository
-root with any static file server. No browser request is made to a provider.
+The site is dependency-free. Serve the repository root over HTTP. Opening
+`index.html` as a `file://` URL cannot load `assets/video-controls.js` as an ES
+module, so mute/play controls never attach. No browser request is made to a
+provider.
+
+The checked-in evidence source is [`data/comparison.json`](data/comparison.json).
+The HTML is a projection of that ledger.
+
+```console
+python3 -m http.server 8765 --bind 127.0.0.1
+# then open http://127.0.0.1:8765/
+```
 
 ```console
 node scripts/validate.mjs --mode authoring
 node scripts/validate.mjs --mode fixture
 node scripts/validate.mjs                 # publish gate; fails while cells are planned
 ```
+
+This checkout still has planned Grok cells, so the default publish command
+fails. Use `--mode authoring` until all four cells are admitted.
 
 Authoring mode validates the complete two-by-two plan and every admitted file.
 Fixture mode is an offline structural check for a planned checkout. Publish
@@ -45,6 +58,8 @@ secret source. They are never command-line arguments, receipts, logs, or
 committed files. Operation state is ignored under `.work/operations/` and is
 keyed by the canonical request fields, so rerunning a command resumes the same
 operation.
+
+`node scripts/capture.mjs --help` lists reserve, run, import, admit, and reconcile.
 
 ```console
 node scripts/capture.mjs reserve --case minimax-official-01 --route minimax-h3 --dry-run

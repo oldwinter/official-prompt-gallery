@@ -53,7 +53,8 @@ thresholds, and the no-migration-before-threshold rule that also binds the
 sibling image gallery. After merge, the image repository must cite
 `https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md`.
 Public receipts contain only an allowlisted transport status, evidence
-variants, timestamps, and hashes.
+variants, timestamps, and hashes. Admitted cells keep those files under
+[`receipts/`](receipts/).
 
 Full decode and a nonblank human review are authoring evidence. CI independently
 checks the checked-in bytes, signatures, sizes, hashes, and recorded facts; it
