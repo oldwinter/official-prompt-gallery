@@ -25,15 +25,16 @@ supplies exact-model capability evidence.
 ## View and validate
 
 The site is dependency-free. Serve the repository root over HTTP so the browser
-can load the ES module for the video controls. With Python 3 installed, run:
+can load the ES module for the video controls. From the repository root, with
+Python 3 installed, run:
 
 ```console
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
 Open <http://127.0.0.1:8000/index.html> in a browser. No browser request is made
-to a provider. Run the offline checks from the repository root in a separate
-terminal:
+to a provider. Run the offline checks in a separate terminal from the same
+directory:
 
 ```console
 node scripts/validate.mjs --mode authoring
