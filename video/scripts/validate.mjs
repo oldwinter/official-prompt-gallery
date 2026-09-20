@@ -523,9 +523,13 @@ export function validateHtmlProjection(html, manifest) {
     if (manifestState === "generated") {
       if (!figureBlock.includes(`<source src="${media}"`)) findings.push({ code: "html-media-path", path: `index.html:${key}`, message: `missing ${media}` });
       if (!figureBlock.includes(`poster="${poster}"`)) findings.push({ code: "html-poster-path", path: `index.html:${key}`, message: `missing ${poster}` });
+      if (!/\bcontrols\b/i.test(figureBlock)) findings.push({ code: "html-native-controls", path: `index.html:${key}`, message: "generated output must retain native video controls" });
     } else {
       if (!figureBlock.includes(`data-asset-path="${media}"`)) findings.push({ code: "html-media-path", path: `index.html:${key}`, message: `missing planned asset path ${media}` });
       if (!figureBlock.includes(`data-poster-path="${poster}"`)) findings.push({ code: "html-poster-path", path: `index.html:${key}`, message: `missing planned poster path ${poster}` });
+      if (/\bcontrols\b/i.test(figureBlock) || /\bdata-video-player\b/i.test(figureBlock)) {
+        findings.push({ code: "html-planned-controls", path: `index.html:${key}`, message: "planned cells must not show native or custom play controls" });
+      }
     }
     if (!figureBlock.includes(manifest.routes[routeId].label)) findings.push({ code: "html-model-label", path: `index.html:${key}`, message: `missing model label ${manifest.routes[routeId].label}` });
     const expectedStatus = manifestState === "generated" ? "GENERATED" : "PLANNED";
@@ -541,7 +545,6 @@ export function validateHtmlProjection(html, manifest) {
     if (!visibleHtml.includes(`data-case-id="${caseId}"`)) findings.push({ code: "html-case-anchor", path: "index.html", message: `case ${caseId} is not represented` });
   }
   if (!visibleHtml.includes("data-video-comparison") || !visibleHtml.includes("data-video-player")) findings.push({ code: "html-video-anchors", path: "index.html", message: "video comparison anchors are required" });
-  if ((visibleHtml.match(/<video\b[^>]*\bcontrols\b/gi) ?? []).length !== expected.size) findings.push({ code: "html-native-controls", path: "index.html", message: "each output must retain native video controls" });
   if (!visibleHtml.includes("data-case-tabs") || !visibleHtml.includes("data-case-tab")) findings.push({ code: "html-case-tabs", path: "index.html", message: "prompt case tabs are required" });
   const firstComparison = visibleHtml.indexOf("data-video-comparison");
   const methodology = visibleHtml.indexOf("id=\"methodology\"");
@@ -766,5 +769,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (mode === "fixture") process.stdout.write("fixture mode: structural authoring checks\n");
   for (const finding of report.findings) process.stdout.write(`${finding.code} ${finding.path}: ${finding.message}\n`);
   process.stdout.write(`${report.ok ? "PASS" : "FAIL"} mode=${mode} planned=${report.planned} generated=${report.generated}${report.ffprobe_checked ? " ffprobe=checked" : ""}\n`);
+  if (!report.ok && mode === "publish" && report.planned > 0) {
+    process.stdout.write("next: this checkout still has planned cells; run `node scripts/validate.mjs --mode authoring`\n");
+  }
   process.exitCode = report.ok ? 0 : 1;
 }
