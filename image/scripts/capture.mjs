@@ -255,7 +255,7 @@ export function parseProviderResponse(route, response) {
   const failed = ['failed', 'error', 'cancelled', 'canceled', 'rejected', 'expired', 'timeout', 'timed_out', 'aborted'].includes(status);
   if (failed) throw new Error('provider reported a failed image operation');
   const remoteJobRef = result?.id || response.id;
-  const pending = ['queued', 'pending', 'processing', 'in_progress', 'running'].includes(status) || (!status && remoteJobRef);
+  const pending = ['queued', 'pending', 'processing', 'in_progress', 'running'].includes(status) || (!status && remoteJobRef && !inline && !remoteUrl);
   if (pending && remoteJobRef) return { kind: 'pending', remote_job_ref: String(remoteJobRef), status: status || 'pending' };
   if (!inline && !remoteUrl) {
     throw new Error('provider response did not contain image data');

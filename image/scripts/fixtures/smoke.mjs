@@ -16,6 +16,22 @@ const request = {
 };
 assert.equal(operationKey(request), operationKey({ ...request }), 'operation keys must be stable');
 assert.equal(parseProviderResponse({ id: 'grok-image' }, { status: 'pending', id: 'job-1' }).kind, 'pending');
+assert.equal(parseProviderResponse({ id: 'grok-image' }, { id: 'job-1' }).kind, 'pending');
+assert.equal(parseProviderResponse({ id: 'grok-image' }, { status: 'processing', id: 'job-1', url: 'https://example.invalid/preview.webp' }).kind, 'pending');
+const completedImage = Buffer.from('offline image fixture');
+const completedInline = parseProviderResponse({ id: 'grok-image' }, {
+  id: 'job-completed-inline',
+  data: [{ b64_json: completedImage.toString('base64') }],
+});
+assert.equal(completedInline.kind, 'completed', 'image data without a status must not become pending just because an ID is present');
+assert.equal(completedInline.remote_job_ref, 'job-completed-inline');
+assert.deepEqual(completedInline.inline_bytes, completedImage);
+const completedUrl = parseProviderResponse({ id: 'grok-image' }, {
+  data: [{ id: 'job-completed-url', url: 'https://example.invalid/completed.webp' }],
+});
+assert.equal(completedUrl.kind, 'completed', 'an image URL without a status is a completed response');
+assert.equal(completedUrl.remote_job_ref, 'job-completed-url');
+assert.equal(completedUrl.download_url, 'https://example.invalid/completed.webp');
 assert.throws(() => parseProviderResponse({ id: 'grok-image' }, { status: 'expired', id: 'job-1' }), /failed image operation/);
 assert.throws(() => parseProviderResponse({ id: 'grok-image' }, { status: 'unknown', id: 'job-1' }), /image data/);
 assert.equal(hasExactServedModel(manifest.routes['grok-image'], { kind: 'not-exposed', reason: 'provider-response-omits-model' }), false);
