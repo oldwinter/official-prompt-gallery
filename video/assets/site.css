@@ -16,6 +16,7 @@
   --radius-control: 3px;
   --radius-frame: 6px;
   --shadow-menu: 0 12px 28px rgba(23, 27, 27, 0.14);
+  color-scheme: light;
 }
 
 * {
@@ -32,7 +33,7 @@ body {
   min-width: 320px;
   margin: 0;
   background: var(--paper);
-  font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif;
+  font-family: "Helvetica Neue", -apple-system, system-ui, sans-serif;
   font-size: 1rem;
   line-height: 1.5;
   text-wrap: pretty;
@@ -105,7 +106,7 @@ button:disabled {
 .masthead-mark {
   align-self: start;
   color: var(--signal);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 0.86rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -121,7 +122,7 @@ button:disabled {
 .case-hash,
 .facts-list dt,
 .methodology-grid h3 {
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.09em;
@@ -177,7 +178,7 @@ button:disabled {
 .header-ledger dd {
   margin: 0;
   color: var(--ink);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 0.8rem;
   font-weight: 700;
 }
@@ -267,7 +268,7 @@ button:disabled {
 .case-nav-note {
   margin-left: auto;
   color: var(--muted);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 0.67rem;
   text-align: right;
 }
@@ -295,7 +296,7 @@ button:disabled {
 
 .case-number {
   color: var(--signal);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 2.8rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -316,7 +317,7 @@ button:disabled {
   max-width: 70ch;
   margin: 12px 0 0;
   color: var(--ink);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: clamp(0.82rem, 1.2vw, 0.96rem);
   line-height: 1.5;
 }
@@ -345,7 +346,7 @@ button:disabled {
 
 .citation-date {
   color: var(--muted);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 0.68rem;
 }
 
@@ -451,7 +452,7 @@ button:disabled {
 .time-readout {
   min-width: 72px;
   color: var(--ink-soft);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 0.7rem;
   text-align: right;
   white-space: nowrap;
@@ -461,7 +462,7 @@ button:disabled {
   min-height: 1.4em;
   margin: 0 0 12px;
   color: var(--muted);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 0.68rem;
 }
 
@@ -519,7 +520,7 @@ button:disabled {
   padding: 16px;
   background: var(--ink);
   color: var(--paper);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 0.74rem;
   letter-spacing: 0.02em;
 }
@@ -698,7 +699,7 @@ button:disabled {
   border-top: 1px solid var(--ink);
   padding-block: 18px 26px;
   color: var(--muted);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 0.66rem;
 }
 

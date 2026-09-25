@@ -16,8 +16,8 @@
   --focus: #0b5bd3;
   --radius-control: 4px;
   --radius-frame: 6px;
-  --font-sans: "IBM Plex Sans", "Avenir Next", "Helvetica Neue", sans-serif;
-  --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  --font-sans: "Avenir Next", "Helvetica Neue", -apple-system, system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   --ease-out: cubic-bezier(.2, .75, .25, 1);
   color-scheme: light;
 }
