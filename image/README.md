@@ -50,7 +50,8 @@ receipts below 25 MiB.
 ## Private capture flow
 
 Credentials are read from the process environment only. They are never put in
-arguments, receipts, or public files. The Codex route is operator-mediated:
+arguments, receipts, or public files. `node scripts/capture.mjs --help` lists
+reserve, run, import, admit, and reconcile. The Codex route is operator-mediated:
 
 ```console
 node scripts/capture.mjs reserve --case openai-official-01 --route codex-image
