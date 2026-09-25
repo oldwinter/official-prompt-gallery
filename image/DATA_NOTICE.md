@@ -8,6 +8,10 @@ comparison.
 Admitted images are AI-generated outputs obtained through private provider
 routes. The manifest records requested model, served-identity evidence, route
 parameters, hashes, media facts, and the limits of what the route exposed.
+The published receipts are
+[`receipts/openai-official-01--codex-image.json`](receipts/openai-official-01--codex-image.json)
+and
+[`receipts/xai-official-01--codex-image.json`](receipts/xai-official-01--codex-image.json).
 There is one sample per case and route. The set is qualitative and
 capability-aligned rather than pixel-identical; it is not a ranking and does
 not identify a winner.

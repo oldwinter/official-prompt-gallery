@@ -53,6 +53,16 @@ does not maintain a duplicate policy. Public media stays on GitHub Pages. CI
 checks the admitted bytes and headers offline; it does not claim to repeat the
 human visual review or call a provider.
 
+## receipts/
+
+Admitted cells publish sanitized receipts under [`receipts/`](receipts/):
+
+- [`receipts/openai-official-01--codex-image.json`](receipts/openai-official-01--codex-image.json)
+- [`receipts/xai-official-01--codex-image.json`](receipts/xai-official-01--codex-image.json)
+
+Those JSON files hold the SHA-256, source hash, and transform facts named
+above. Planned Grok cells have no public receipt until admission.
+
 ## Reproducibility boundary
 
 `scripts/validate.mjs` is deterministic and network-free. `scripts/capture.mjs`
