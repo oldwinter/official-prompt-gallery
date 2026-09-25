@@ -54,6 +54,8 @@ committed files. Operation state is ignored under `.work/operations/` and is
 keyed by the canonical request fields, so rerunning a command resumes the same
 operation.
 
+`node scripts/capture.mjs --help` lists reserve, run, import, admit, and reconcile.
+
 ```console
 node scripts/capture.mjs reserve --case minimax-official-01 --route minimax-h3 --dry-run
 node scripts/capture.mjs run --case minimax-official-01 --route grok-video --dry-run

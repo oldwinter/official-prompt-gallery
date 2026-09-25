@@ -841,7 +841,24 @@ async function commandReconcile(args) {
   process.stdout.write(`reconciled to ${result.phase}; admit after review\n`);
 }
 
+function printHelp() {
+  process.stdout.write(
+    [
+      "usage: node scripts/capture.mjs <reserve|run|import|admit|reconcile> [options]",
+      "  reserve/run: --case CASE --route ROUTE [--dry-run]",
+      "  import: --operation .work/operations/KEY --file PRIVATE_VIDEO [--poster POSTER]",
+      "  admit: --operation .work/operations/KEY",
+      "  reconcile: --operation .work/operations/KEY (--file PRIVATE_VIDEO | --remote-job-ref REF)",
+      "",
+    ].join("\n"),
+  );
+}
+
 async function main(argv) {
+  if (argv.includes("-h") || argv.includes("--help")) {
+    printHelp();
+    return;
+  }
   const args = parseFlagArgs(argv);
   const command = args.positional[0];
   if (!command || !["reserve", "run", "import", "admit", "reconcile"].includes(command)) {
@@ -859,6 +876,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     await main(process.argv.slice(2));
   } catch (error) {
     process.stderr.write(`capture: ${error.message}\n`);
+    if (error.message.startsWith("usage:")) {
+      process.stderr.write("next: node scripts/capture.mjs --help\n");
+    }
     process.exitCode = 1;
   }
 }
