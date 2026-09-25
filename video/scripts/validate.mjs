@@ -526,9 +526,10 @@ export function validateHtmlProjection(html, manifest) {
     } else {
       if (!figureBlock.includes(`data-asset-path="${media}"`)) findings.push({ code: "html-media-path", path: `index.html:${key}`, message: `missing planned asset path ${media}` });
       if (!figureBlock.includes(`data-poster-path="${poster}"`)) findings.push({ code: "html-poster-path", path: `index.html:${key}`, message: `missing planned poster path ${poster}` });
+      if (/<video\b/i.test(figureBlock)) findings.push({ code: "html-planned-player", path: `index.html:${key}`, message: "planned cells must not render a video player" });
     }
     if (!figureBlock.includes(manifest.routes[routeId].label)) findings.push({ code: "html-model-label", path: `index.html:${key}`, message: `missing model label ${manifest.routes[routeId].label}` });
-    const expectedStatus = manifestState === "generated" ? "GENERATED" : "PLANNED";
+    const expectedStatus = manifestState === "generated" ? "ADMITTED" : "PLANNED";
     if (!new RegExp(`<span\\b[^>]*class=["']state-tag["'][^>]*>${expectedStatus}<\\/span>`, "i").test(figureBlock)) findings.push({ code: "html-status", path: `index.html:${key}`, message: `status tag must be ${expectedStatus}` });
     const expectedNote = manifestState === "generated" ? "Admitted output" : "Asset pending admission";
     if (!figureBlock.includes(expectedNote)) findings.push({ code: "html-status", path: `index.html:${key}`, message: `media note must include ${expectedNote}` });
@@ -541,7 +542,11 @@ export function validateHtmlProjection(html, manifest) {
     if (!visibleHtml.includes(`data-case-id="${caseId}"`)) findings.push({ code: "html-case-anchor", path: "index.html", message: `case ${caseId} is not represented` });
   }
   if (!visibleHtml.includes("data-video-comparison") || !visibleHtml.includes("data-video-player")) findings.push({ code: "html-video-anchors", path: "index.html", message: "video comparison anchors are required" });
-  if ((visibleHtml.match(/<video\b[^>]*\bcontrols\b/gi) ?? []).length !== expected.size) findings.push({ code: "html-native-controls", path: "index.html", message: "each output must retain native video controls" });
+  const generatedCount = [...expected].filter((key) => {
+    const [caseId, routeId] = key.split("--");
+    return manifest.samples[caseId][routeId].state.kind === "generated";
+  }).length;
+  if ((visibleHtml.match(/<video\b[^>]*\bcontrols\b/gi) ?? []).length !== generatedCount) findings.push({ code: "html-native-controls", path: "index.html", message: "each generated output must retain native video controls; planned cells show a placeholder frame" });
   if (!visibleHtml.includes("data-case-tabs") || !visibleHtml.includes("data-case-tab")) findings.push({ code: "html-case-tabs", path: "index.html", message: "prompt case tabs are required" });
   const firstComparison = visibleHtml.indexOf("data-video-comparison");
   const methodology = visibleHtml.indexOf("id=\"methodology\"");

@@ -605,10 +605,35 @@ async function updateHtmlState(caseId, routeId, repositoryRoot = REPOSITORY_ROOT
   const html = await readFile(htmlPath, "utf8");
   const figurePattern = new RegExp(`(<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[^>]*data-state=")planned("[^>]*>)`, "i");
   if (!figurePattern.test(html)) return;
-  const updated = html.replace(figurePattern, "$1generated$2");
+  const manifest = parseManifest(await readFile(join(fileURLToPathIfUrl(repositoryRoot), "data", "comparison.json"), "utf8"));
+  const label = manifest.routes[routeId]?.label;
+  if (!label) throw new Error(`no manifest route label for ${routeId}`);
+  const media = mediaPath(manifest.media_kind, caseId, routeId);
+  const poster = posterPath(caseId, routeId);
+  const player =
+    `<video controls playsinline preload="metadata" poster="${poster}" data-video-player data-provider="${label}" aria-label="${label} admitted output">` +
+    `<source src="${media}" type="video/mp4">` +
+    `This ${label} video is admitted and available with native controls.` +
+    `</video>`;
+  let updated = html.replace(figurePattern, "$1generated$2");
+  const blockPattern = new RegExp(
+    `(<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[^>]*)(>)([\\s\\S]*?)(</figure>)`,
+    "i",
+  );
+  updated = updated.replace(blockPattern, (match, tagAttrs, gt, inner, close) => {
+    const cleanedTag = tagAttrs
+      .replace(/\s+data-asset-path="[^"]*"/i, "")
+      .replace(/\s+data-poster-path="[^"]*"/i, "");
+    const promoted = inner
+      .replace(/<div class="planned-frame"[^>]*>/i, '<div class="planned-frame" aria-hidden="true">')
+      .replace("Asset pending admission", "Admitted output")
+      .replace(/(<div class="planned-frame"[^>]*>[\s\S]*?<\/div>)/i, `$1\n                  ${player}`);
+    return `${cleanedTag}${gt}${promoted}${close}`;
+  });
+  if (!updated.includes(player)) throw new Error(`HTML admission projection for ${caseId}/${routeId} did not insert the video player`);
   const statusPattern = new RegExp(`(<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[\\s\\S]*?<span class="state-tag">)PLANNED(</span>)`, "i");
   const statusReplacements = updated.match(statusPattern) ? 1 : 0;
-  const withStatus = updated.replace(statusPattern, (match, prefix, suffix) => `${prefix}GENERATED${suffix}`);
+  const withStatus = updated.replace(statusPattern, (match, prefix, suffix) => `${prefix}ADMITTED${suffix}`);
   if (statusReplacements !== 1) throw new Error(`HTML status projection for ${caseId}/${routeId} matched ${statusReplacements} cards`);
   const temporary = `${htmlPath}.tmp-${process.pid}`;
   await writeFile(temporary, withStatus, { mode: 0o644 });

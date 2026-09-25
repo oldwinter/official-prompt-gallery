@@ -432,6 +432,10 @@ main {
   letter-spacing: .1em;
 }
 
+.output-card[data-state="planned"] .image-frame::before {
+  content: "IMAGE / PLANNED";
+}
+
 .image-frame::after {
   position: absolute;
   right: 16px;
@@ -462,6 +466,10 @@ main {
   line-height: 1.4;
 }
 
+.output-card[data-state="planned"] {
+  border-style: dashed;
+}
+
 .output-card[data-state="planned"] .asset-link img {
   opacity: 0;
 }
@@ -486,6 +494,16 @@ main {
 
 .output-card[data-state="generated"] .planned-note {
   display: none;
+}
+
+.planned-action {
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
 }
 
 .output-card figcaption {
