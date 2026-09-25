@@ -40,6 +40,9 @@ node scripts/validate.mjs --mode authoring
 node scripts/validate.mjs
 ```
 
+This checkout still has planned Grok cells, so the default publish command
+fails. Use `--mode authoring` until all four cells are admitted.
+
 Authoring mode permits planned cells. The default publish
 mode is the release gate and requires all four admitted images and sanitized
 receipts below 25 MiB.
