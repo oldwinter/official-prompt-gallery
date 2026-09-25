@@ -244,11 +244,23 @@
       }
     }
 
+    function isModifiedClick(event) {
+      return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+    }
+
     cards.forEach(function (entry) {
       listen(entry.button, 'click', function (event) {
         event.preventDefault();
         open(entry.record, entry.button);
       });
+      var assetLink = entry.record.card.querySelector('a.asset-link[href]');
+      if (assetLink && entry.record.state === 'generated') {
+        listen(assetLink, 'click', function (event) {
+          if (event.defaultPrevented || event.button !== 0 || isModifiedClick(event)) return;
+          event.preventDefault();
+          open(entry.record, assetLink);
+        });
+      }
     });
     viewInputs.forEach(function (input) {
       listen(input, 'change', function () { setView(input.value); });
