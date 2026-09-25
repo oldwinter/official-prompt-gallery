@@ -47,11 +47,11 @@ the 25 MiB per-file admission guard, the manifest records the source digest and 
 transform tool/version/arguments. That 25 MiB guard is the local hard limit
 aligned with GitHub's documented browser-upload cap; GitHub Pages itself
 publishes a 1 GB site cap and a 100 GB/month soft bandwidth cap, not a separate
-per-file Pages byte limit. See [docs/hosting-policy.md](docs/hosting-policy.md)
+per-file Pages byte limit. See [docs/hosting-policy.md](../docs/hosting-policy.md)
 for measured sizes, documented GitHub and Cloudflare limits, local review
 thresholds, and the no-migration-before-threshold rule that also binds the
-sibling image gallery. After merge, the image repository must cite
-`https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md`.
+sibling image gallery. Both galleries cite
+`https://github.com/oldwinter/official-prompt-gallery/blob/main/docs/hosting-policy.md`.
 Public receipts contain only an allowlisted transport status, evidence
 variants, timestamps, and hashes.
 

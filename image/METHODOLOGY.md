@@ -46,7 +46,7 @@ in the manifest and receipt. That 25 MiB guard is the local hard limit aligned
 with GitHub's documented browser-upload cap; GitHub Pages itself publishes a
 1 GB site cap and a 100 GB/month soft bandwidth cap, not a separate per-file
 Pages byte limit. See the canonical
-[hosting policy](https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md)
+[hosting policy](../docs/hosting-policy.md)
 for measured sizes, documented GitHub and Cloudflare limits, local review
 thresholds, and the no-migration-before-threshold rule. This image gallery
 does not maintain a duplicate policy. Public media stays on GitHub Pages. CI
