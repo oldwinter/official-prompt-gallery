@@ -1,10 +1,12 @@
 # Official Prompt Image Gallery
 
 This repository is a static evidence sheet for two image prompts copied from
-official OpenAI and xAI guides. Open `index.html` locally or visit the GitHub
-Pages site after deployment. The first screen contains the first prompt, its
-source citation, and the two route cells; JavaScript only adds tabs and an
-image focus dialog.
+official OpenAI and xAI guides. The evidence source of truth is
+[`data/comparison.json`](data/comparison.json). `index.html` is a static
+projection of that ledger; `scripts/validate.mjs` checks they match. Open
+`index.html` locally or visit the GitHub Pages site after deployment. The first
+screen contains the first prompt, its source citation, and the two route cells;
+JavaScript only adds tabs and an image focus dialog.
 
 The comparison is deliberately small and honest:
 
