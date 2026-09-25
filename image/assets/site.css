@@ -84,7 +84,7 @@ input[type="range"] {
   transition: transform 160ms var(--ease-out);
 }
 
-.skip-link:focus {
+.skip-link:focus-visible {
   transform: translateY(0);
 }
 
