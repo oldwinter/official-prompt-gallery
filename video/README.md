@@ -24,6 +24,11 @@ supplies exact-model capability evidence.
 
 ## View and validate
 
+The evidence source of truth is [`data/comparison.json`](data/comparison.json)
+(cases, routes, and planned vs generated cells). `index.html` is a static
+projection of that ledger. Edit the JSON first; `node scripts/validate.mjs
+--mode authoring` checks that the page matches.
+
 The site is dependency-free. Open `index.html` locally or serve the repository
 root with any static file server. No browser request is made to a provider.
 
