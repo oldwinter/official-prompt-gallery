@@ -32,6 +32,10 @@ Private credentials, cookies, raw provider responses, signed download URLs,
 operation state, originals, and local visual-review evidence are excluded from
 the public tree. Questions about a particular output should include its
 published case/route key and receipt hash rather than private provider data.
+The published receipts are
+[`receipts/minimax-official-01--minimax-h3.json`](receipts/minimax-official-01--minimax-h3.json)
+and
+[`receipts/xai-official-01--minimax-h3.json`](receipts/xai-official-01--minimax-h3.json).
 
 Public media stays on GitHub Pages under the canonical
 [hosting policy](../docs/hosting-policy.md). Originals are not moved to GitHub

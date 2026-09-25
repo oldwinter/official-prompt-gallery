@@ -55,6 +55,13 @@ sibling image gallery. Both galleries cite
 Public receipts contain only an allowlisted transport status, evidence
 variants, timestamps, and hashes.
 
+Admitted cells publish those receipts under [`receipts/`](receipts/):
+
+- [`receipts/minimax-official-01--minimax-h3.json`](receipts/minimax-official-01--minimax-h3.json)
+- [`receipts/xai-official-01--minimax-h3.json`](receipts/xai-official-01--minimax-h3.json)
+
+Planned Grok cells have no public receipt until admission.
+
 Full decode and a nonblank human review are authoring evidence. CI independently
 checks the checked-in bytes, signatures, sizes, hashes, and recorded facts; it
 does not claim to have repeated a paid generation or the human visual review.
