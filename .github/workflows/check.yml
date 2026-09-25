@@ -1,4 +1,4 @@
-name: Check static gallery
+name: Check static galleries
 
 on:
   push:
@@ -10,6 +10,13 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        gallery: [image, video]
+    defaults:
+      run:
+        working-directory: ${{ matrix.gallery }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -19,9 +26,7 @@ jobs:
           node-version: "26.8.1"
       - name: Check JavaScript syntax
         run: |
-          node --check assets/image-inspector.js
-          node --check scripts/validate.mjs
-          node --check scripts/capture.mjs
+          for file in assets/*.js scripts/validate.mjs scripts/capture.mjs; do node --check "$file"; done
       - name: Validate authoring projection
         run: node scripts/validate.mjs --mode authoring
       - name: Run offline smoke fixture

@@ -1,17 +1,21 @@
 # Free-hosting growth policy
 
-This is the single canonical hosting policy for both public galleries:
+This is the single canonical hosting policy for both public galleries, which live in
+[oldwinter/official-prompt-gallery](https://github.com/oldwinter/official-prompt-gallery):
 
-- [oldwinter/official-prompt-video-gallery](https://github.com/oldwinter/official-prompt-video-gallery)
-- [oldwinter/official-prompt-image-gallery](https://github.com/oldwinter/official-prompt-image-gallery)
+- [`image/`](../image/) — official prompt image gallery
+- [`video/`](../video/) — official prompt video gallery
 
-Both sites deploy as static GitHub Pages trees from the repository root. This document records measured bytes, documented platform limits, local review thresholds, and the rule for when originals may leave Pages. It does not migrate hosting.
+Both galleries deploy together as one static GitHub Pages tree from the repository root
+(`/image/` and `/video/`), so they share one published-site cap and one bandwidth budget.
+They were separate repositories (`official-prompt-image-gallery`, `official-prompt-video-gallery`)
+until 2026-09-25. This document records measured bytes, documented platform limits, local review thresholds, and the rule for when originals may leave Pages. It does not migrate hosting.
 
-Canonical URL after this file is on `main`:
+Canonical URL:
 
-`https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md`
+`https://github.com/oldwinter/official-prompt-gallery/blob/main/docs/hosting-policy.md`
 
-The image repository must point at that exact URL after merge. Do not copy a second policy into the image tree.
+Both gallery trees link here. Do not copy a second policy into either tree.
 
 ## Current measurements
 
@@ -124,4 +128,4 @@ Generation already happens outside Pages. The public question is only where admi
 
 ## Bound
 
-This policy applies to both galleries. Changing it requires a documentation change in this file on `official-prompt-video-gallery` `main`. The image gallery links here; it does not fork the numbers.
+This policy applies to both galleries. Changing it requires a documentation change in this file on `official-prompt-gallery` `main`. Both galleries link here; neither forks the numbers.

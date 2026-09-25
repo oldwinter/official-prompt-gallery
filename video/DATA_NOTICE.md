@@ -34,7 +34,7 @@ the public tree. Questions about a particular output should include its
 published case/route key and receipt hash rather than private provider data.
 
 Public media stays on GitHub Pages under the canonical
-[hosting policy](docs/hosting-policy.md). Originals are not moved to GitHub
-Releases or Cloudflare R2 until a threshold in that policy is reached. After
-merge, the sibling image gallery must point to the same policy URL:
-`https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md`.
+[hosting policy](../docs/hosting-policy.md). Originals are not moved to GitHub
+Releases or Cloudflare R2 until a threshold in that policy is reached. The
+sibling image gallery points to the same policy URL:
+`https://github.com/oldwinter/official-prompt-gallery/blob/main/docs/hosting-policy.md`.

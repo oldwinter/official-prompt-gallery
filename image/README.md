@@ -77,10 +77,9 @@ default validator locally as the strict four-cell publish gate.
 
 This image gallery does not maintain a duplicate hosting policy. Free-hosting
 growth for both public galleries is governed by the canonical
-[hosting policy](https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md)
-in the sibling video repository:
+[hosting policy](../docs/hosting-policy.md) at the repository root:
 
-`https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md`
+`https://github.com/oldwinter/official-prompt-gallery/blob/main/docs/hosting-policy.md`
 
 Admitted images remain on GitHub Pages. Originals are not moved to GitHub
 Releases or Cloudflare R2 until a threshold in that policy is actually reached.

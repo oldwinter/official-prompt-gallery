@@ -29,7 +29,7 @@ review notes are included in this repository. CI is secretless and performs no
 generation calls.
 
 Public media stays on GitHub Pages under the canonical
-[hosting policy](https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md).
+[hosting policy](../docs/hosting-policy.md).
 This image gallery does not maintain a duplicate policy. Originals are not
 moved to GitHub Releases or Cloudflare R2 until a threshold in that policy is
 reached.
