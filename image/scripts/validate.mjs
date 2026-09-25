@@ -401,17 +401,20 @@ export function validateHtmlProjection(html, manifest) {
     if (sample?.state.kind === 'planned') {
       if (!new RegExp(`data-asset-path="${escapeRegExp(expectedPath)}"`, 'i').test(body)) errors.push({ code: 'html-path', path: `index.html:${key}`, message: `missing planned asset path ${expectedPath}` });
       if (!/src="assets\/planned-image\.webp"/i.test(body)) errors.push({ code: 'html-path', path: `index.html:${key}`, message: 'missing local planned placeholder' });
+      if (/<button\b[^>]*\bdata-inspect\b/i.test(body)) errors.push({ code: 'html-inspect', path: `index.html:${key}`, message: 'planned cell must not expose an inspect action' });
+      if (/<a\b[^>]*\bclass="asset-link"/i.test(body)) errors.push({ code: 'html-link', path: `index.html:${key}`, message: 'planned cell must not link to unpublished media' });
     } else {
       const imagePattern = new RegExp(`<img\\b[^>]*src="${escapeRegExp(expectedPath)}"`, 'i');
       const linkPattern = new RegExp(`<a\\b[^>]*href="${escapeRegExp(expectedPath)}"`, 'i');
       if (!imagePattern.test(body)) errors.push({ code: 'html-path', path: `index.html:${key}`, message: `missing image src ${expectedPath}` });
       if (!linkPattern.test(body)) errors.push({ code: 'html-path', path: `index.html:${key}`, message: `missing ordinary image link ${expectedPath}` });
+      if (!/<button\b[^>]*\bdata-inspect\b/i.test(body)) errors.push({ code: 'html-inspect', path: `index.html:${key}`, message: 'generated cell must expose an inspect action' });
     }
     const stateMatch = match[0].match(/data-state="(planned|generated)"/i);
     if (!stateMatch) errors.push({ code: 'html-state', path: `index.html:${key}`, message: 'figure must project planned or generated state' });
     if (CASE_IDS.includes(caseId) && ROUTE_IDS.includes(routeId)) {
       if (stateMatch && stateMatch[1].toLowerCase() !== sample.state.kind) errors.push({ code: 'html-state', path: `index.html:${key}`, message: `figure state must match manifest (${sample.state.kind})` });
-      const statusExpected = sample.state.kind === 'generated' ? 'GENERATED' : 'PLANNED';
+      const statusExpected = sample.state.kind === 'generated' ? 'ADMITTED' : 'PLANNED';
       if (!new RegExp(`<span\\b[^>]*class="status-tag"[^>]*>${statusExpected}<\\/span>`, 'i').test(body)) errors.push({ code: 'html-status', path: `index.html:${key}`, message: `status tag must be ${statusExpected}` });
       const noteExpected = sample.state.kind === 'generated' ? 'Admitted output' : 'Awaiting admitted output';
       if (!new RegExp(`<p\\b[^>]*class="planned-note"[^>]*>${escapeRegExp(noteExpected)}<\\/p>`, 'i').test(body)) errors.push({ code: 'html-status', path: `index.html:${key}`, message: `media note must be ${noteExpected}` });

@@ -16,8 +16,8 @@
   --focus: #0b5bd3;
   --radius-control: 4px;
   --radius-frame: 6px;
-  --font-sans: "IBM Plex Sans", "Avenir Next", "Helvetica Neue", sans-serif;
-  --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  --font-sans: "Avenir Next", "Helvetica Neue", -apple-system, system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   --ease-out: cubic-bezier(.2, .75, .25, 1);
   color-scheme: light;
 }
@@ -432,6 +432,10 @@ main {
   letter-spacing: .1em;
 }
 
+.output-card[data-state="planned"] .image-frame::before {
+  content: "IMAGE / PLANNED";
+}
+
 .image-frame::after {
   position: absolute;
   right: 16px;
@@ -462,6 +466,10 @@ main {
   line-height: 1.4;
 }
 
+.output-card[data-state="planned"] {
+  border-style: dashed;
+}
+
 .output-card[data-state="planned"] .asset-link img {
   opacity: 0;
 }
@@ -486,6 +494,16 @@ main {
 
 .output-card[data-state="generated"] .planned-note {
   display: none;
+}
+
+.planned-action {
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
 }
 
 .output-card figcaption {

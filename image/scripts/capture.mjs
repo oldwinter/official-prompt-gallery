@@ -619,7 +619,7 @@ export function sanitizeReceipt(result, operation) {
   return receiptFor(state, publicHash, result?.completed_at || now(), result?.media_content_type || 'image/webp');
 }
 
-async function updateHtmlState(caseId, routeId, stateKind, repositoryRoot = REPOSITORY_ROOT, facts = null) {
+export async function updateHtmlState(caseId, routeId, stateKind, repositoryRoot = REPOSITORY_ROOT, facts = null) {
   const htmlPath = path.join(path.resolve(repositoryRoot), 'index.html');
   const html = await fs.readFile(htmlPath, 'utf8');
   const keyPattern = new RegExp(`(<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[^>]*data-state=")planned("[^>]*>)`, 'i');
@@ -627,8 +627,41 @@ async function updateHtmlState(caseId, routeId, stateKind, repositoryRoot = REPO
   const updated = html.replace(keyPattern, `$1${stateKind}$2`);
   const cardPattern = new RegExp(`(<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[\\s\\S]*?<span class="status-tag">)PLANNED(</span>[\\s\\S]*?<p class="planned-note">)Awaiting admitted output(</p>)`, 'i');
   const labelReplacements = updated.match(cardPattern) ? 1 : 0;
-  let withLabel = updated.replace(cardPattern, (match, prefix, between, closing) => `${prefix}GENERATED${between}Admitted output${closing}`);
+  let withLabel = updated.replace(cardPattern, (match, prefix, between, closing) => `${prefix}ADMITTED${between}Admitted output${closing}`);
   if (labelReplacements !== 1) throw new Error(`HTML status projection for ${caseId}/${routeId} matched ${labelReplacements} cards`);
+  if (stateKind === 'generated') {
+    const manifest = parseManifest(await fs.readFile(path.join(path.resolve(repositoryRoot), 'data/comparison.json'), 'utf8'));
+    const mediaRelative = mediaPath('image', caseId, routeId);
+    const routeLabel = manifest.routes?.[routeId]?.label || routeId;
+    const caseTitle = String(manifest.cases?.[caseId]?.title || caseId).toLowerCase();
+    const figurePrefix = `<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[\\s\\S]*?`;
+    const mediaProjections = [
+      {
+        pattern: new RegExp(`(${figurePrefix})<div class="asset-link" data-asset-path="[^"]*">`, 'i'),
+        replacement: (prefix) => `${prefix}<a class="asset-link" href="${mediaRelative}" aria-label="Open ${routeLabel} output for the ${caseTitle} prompt">`
+      },
+      {
+        pattern: new RegExp(`(${figurePrefix}<img\\b[^>]*?)src="assets/planned-image\\.webp"`, 'i'),
+        replacement: (prefix) => `${prefix}src="${mediaRelative}"`
+      },
+      {
+        pattern: new RegExp(`(${figurePrefix}data-image[^>]*>)(\\s*)</div>`, 'i'),
+        replacement: (prefix, whitespace) => `${prefix}${whitespace}</a>`
+      },
+      {
+        pattern: new RegExp(`(${figurePrefix})<p class="planned-action">[^<]*</p>`, 'i'),
+        replacement: (prefix) => `${prefix}<button class="inspect-button" type="button" data-inspect aria-haspopup="dialog" aria-label="Inspect ${routeLabel} output for the ${caseTitle} prompt">Inspect image <span aria-hidden="true">↗</span></button>`
+      }
+    ];
+    for (const { pattern, replacement } of mediaProjections) {
+      let count = 0;
+      withLabel = withLabel.replace(pattern, (match, ...args) => {
+        count += 1;
+        return replacement(...args.slice(0, -2));
+      });
+      if (count !== 1) throw new Error(`HTML media projection for ${caseId}/${routeId} matched ${count} fragments`);
+    }
+  }
   const admissionPattern = new RegExp(`(<figure\\b[^>]*data-case-id="${caseId}"[^>]*data-route-id="${routeId}"[\\s\\S]*?<dt>Admission</dt><dd>)Planned; no public bytes yet(</dd>)`, 'i');
   withLabel = withLabel.replace(admissionPattern, '$1Admitted; public bytes available$2');
   if (facts?.width && facts?.height) {
