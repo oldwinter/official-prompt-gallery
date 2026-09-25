@@ -85,8 +85,10 @@ remain subject to the relevant source and provider terms. See
 ## GitHub Pages
 
 The public site deploys as a static GitHub Pages tree from the repository root.
-`pages.yml` uploads that tree without a build, provider call, or server. Run the
-default validator locally as the strict four-cell publish gate.
+`pages.yml` uploads that tree without a build, provider call, or server. The
+current checkout contains two planned cells, so validate it locally with
+`--mode authoring`. The default publish mode is the release gate and only
+passes once all four cells are admitted with media and receipts.
 
 This image gallery does not maintain a duplicate hosting policy. Free-hosting
 growth for both public galleries is governed by the canonical

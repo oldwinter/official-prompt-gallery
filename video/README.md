@@ -87,8 +87,10 @@ license. See [METHODOLOGY.md](METHODOLOGY.md) and [DATA_NOTICE.md](DATA_NOTICE.m
 `check.yml` is a read-only, secretless authoring check. `pages.yml` validates the
 same static tree while allowing clearly marked planned cells, then uploads the
 repository root as a Pages artifact; it does not build, call a provider, install
-packages, or require a server. Run the default validator locally as the strict
-four-cell publish gate.
+packages, or require a server. The current checkout contains two planned cells,
+so validate it locally with `--mode authoring`. The default publish mode is the
+release gate and only passes once all four cells are admitted with media and
+receipts.
 
 Free-hosting growth for this gallery and the sibling image gallery is governed
 by the canonical [hosting policy](../docs/hosting-policy.md) at the repository
