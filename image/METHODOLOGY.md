@@ -1,0 +1,61 @@
+# Methodology
+
+## Prompt selection
+
+The gallery freezes one exact example prompt from each official guide:
+
+1. OpenAI: "A children's book drawing of a veterinarian using a stethoscope to listen to the heartbeat of a baby otter."
+2. xAI: "A collage of London landmarks in a stenciled street-art style"
+
+The canonical URLs and retrieval date are stored in `data/comparison.json` and
+are repeated as visible links in each case article. The validator recomputes
+the SHA-256 of each prompt so punctuation and spacing changes are visible.
+
+## Request matrix
+
+The matrix specifies one request per prompt and route: the private Codex image
+entitlement requesting `gpt-image-2`, and a private Sub2API route intended to
+request `grok-imagine-image-2.0`. Both planned Grok requests use a 1:1 aspect ratio,
+1024 × 1024 output, and medium quality where the route accepts that field.
+Seed behavior is recorded as an explicit evidence variant. A route that does
+not expose a served snapshot or exact cost is labelled as such; no identity or
+price is inferred from the requested model name.
+
+Admission of an exact-model cell requires evidence from the same execution
+route: either a capability response that binds the exact model ID to the image
+operation or a terminal response that reports the exact served model. A model
+catalog from one route cannot establish the identity of bytes returned by a
+different route.
+
+## What the sample means
+
+There is one sample per prompt and route. This supports close visual
+inspection, not a benchmark, ranking, or claim about general model quality.
+The routes are capability-aligned rather than pixel-identical: private route
+defaults, safety systems, and provider preprocessing can differ. No attempt is
+made to make those differences disappear.
+
+## Admission and derivatives
+
+Capture state is private under ignored `.work/`. A source image is checked for
+an image signature and dimensions, fully decoded with ImageMagick, and reviewed
+for nonblank content by a person before
+admission. The browser receives a WebP derivative below the 25 MiB per-file
+admission guard. Its SHA-256, source hash, and transform arguments are recorded
+in the manifest and receipt. That 25 MiB guard is the local hard limit aligned
+with GitHub's documented browser-upload cap; GitHub Pages itself publishes a
+1 GB site cap and a 100 GB/month soft bandwidth cap, not a separate per-file
+Pages byte limit. See the canonical
+[hosting policy](https://github.com/oldwinter/official-prompt-video-gallery/blob/main/docs/hosting-policy.md)
+for measured sizes, documented GitHub and Cloudflare limits, local review
+thresholds, and the no-migration-before-threshold rule. This image gallery
+does not maintain a duplicate policy. Public media stays on GitHub Pages. CI
+checks the admitted bytes and headers offline; it does not claim to repeat the
+human visual review or call a provider.
+
+## Reproducibility boundary
+
+`scripts/validate.mjs` is deterministic and network-free. `scripts/capture.mjs`
+is an authoring tool, not part of the published runtime. Credentials,
+provider responses, signed URLs, raw images, and remote job references remain
+in private local state and never enter the public ledger.
