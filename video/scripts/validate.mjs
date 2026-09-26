@@ -483,6 +483,13 @@ function validateReceipt(receipt, path, findings, manifest, caseId, routeId) {
     }
     parseCost(receipt.cost, `${path}.cost`);
     hashValue(receipt.response_media_sha256, `${path}.response_media_sha256`);
+    const asset = manifest.samples[caseId][routeId].state.asset;
+    if (asset.provenance.kind === "direct-provider-output" && receipt.response_media_sha256 !== asset.sha256) {
+      fail(`${path}.response_media_sha256`, "does not match public asset hash");
+    }
+    if (asset.provenance.kind === "web-derivative" && receipt.response_media_sha256 !== asset.provenance.source_sha256) {
+      fail(`${path}.response_media_sha256`, "does not match derivative source hash");
+    }
     const serialized = JSON.stringify(receipt);
     if (/["'](?:authorization|cookie|api[_-]?key|token|signed[_-]?url|download[_-]?url|job[_-]?id|remote[_-]?job)/i.test(serialized)) {
       fail(path, "contains a forbidden credential or remote-operation field");
