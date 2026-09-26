@@ -14,7 +14,10 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-NODE = shutil.which("node")
+# Resolve version-manager shims before PATH isolation, including probe shebangs.
+NODE = subprocess.check_output(
+    [shutil.which("node"), "-p", "process.execPath"], text=True,
+).strip()
 CASE = "minimax-official-01"
 ROUTE = "grok-video"
 PROBE = {
