@@ -3,8 +3,8 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPOSITORY_ROOT = path.resolve(fileURLToPath(new URL('../', import.meta.url)));
+const DEPLOYED_BASE_URL = new URL('https://oldwinter.github.io/official-prompt-gallery/');
 const REFERENCE_PATTERN = /\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))/gi;
-const EXTERNAL_PATTERN = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 
 function landingReferences(html) {
   const references = [];
@@ -12,11 +12,18 @@ function landingReferences(html) {
   for (const match of html.matchAll(REFERENCE_PATTERN)) {
     const raw = (match[1] ?? match[2] ?? match[3] ?? '').trim();
     const reference = raw.split(/[?#]/, 1)[0];
-    if (!reference || EXTERNAL_PATTERN.test(reference) || seen.has(reference)) continue;
+    if (!reference || seen.has(reference)) continue;
     seen.add(reference);
     references.push({ reference, line: html.slice(0, match.index).split('\n').length });
   }
   return references;
+}
+
+function deployedSitePath(pathname) {
+  const base = DEPLOYED_BASE_URL.pathname;
+  if (pathname === base.slice(0, -1)) return '';
+  if (pathname.startsWith(base)) return pathname.slice(base.length);
+  return null;
 }
 
 async function statKind(filePath) {
@@ -38,16 +45,31 @@ export async function checkLanding(root = REPOSITORY_ROOT) {
     return { checked: 0, errors: [{ code: 'landing', path: 'index.html', message: `cannot read the Pages landing page: ${error.message}` }] };
   }
   const references = landingReferences(html);
+  let checked = 0;
   for (const { reference, line } of references) {
     const location = `index.html:${line}`;
+    let url;
+    try {
+      url = new URL(reference, DEPLOYED_BASE_URL);
+    } catch {
+      errors.push({ code: 'reference', path: location, message: `${reference} cannot be resolved against ${DEPLOYED_BASE_URL}` });
+      continue;
+    }
+    if (url.origin !== DEPLOYED_BASE_URL.origin) continue;
+    checked += 1;
+    const sitePath = deployedSitePath(url.pathname);
+    if (sitePath === null) {
+      errors.push({ code: 'reference', path: location, message: `${reference} resolves to ${url.pathname}, outside the ${DEPLOYED_BASE_URL.pathname} Pages tree` });
+      continue;
+    }
     let decoded;
     try {
-      decoded = decodeURIComponent(reference);
+      decoded = decodeURIComponent(sitePath);
     } catch {
       errors.push({ code: 'reference', path: location, message: `${reference} is not valid percent-encoding` });
       continue;
     }
-    const resolved = path.resolve(root, decoded.replace(/^\/+/, ''));
+    const resolved = path.resolve(root, decoded);
     const relative = path.relative(root, resolved);
     if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
       errors.push({ code: 'reference', path: location, message: `${reference} escapes the deployed tree` });
@@ -63,7 +85,7 @@ export async function checkLanding(root = REPOSITORY_ROOT) {
       errors.push({ code: 'missing-file', path: location, message: `${reference} is a directory without index.html` });
     }
   }
-  return { checked: references.length, errors };
+  return { checked, errors };
 }
 
 function printReport(report) {

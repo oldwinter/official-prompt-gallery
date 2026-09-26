@@ -18,9 +18,12 @@ jobs:
         with:
           node-version: "26.8.1"
       - name: Check JavaScript syntax
-        run: node --check scripts/check-landing.mjs
+        run: |
+          for file in scripts/check-landing.mjs scripts/fixtures/smoke.mjs; do node --check "$file"; done
       - name: Check landing page references
         run: node scripts/check-landing.mjs
+      - name: Run offline smoke fixture
+        run: node scripts/fixtures/smoke.mjs
   validate:
     runs-on: ubuntu-latest
     strategy:
