@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { h3FormData, parseProviderResponse, operationKey } from '../capture.mjs';
 import { hasExactServedModel, parseManifest, validateHtmlProjection } from '../validate.mjs';
+import './video-controls.mjs';
 
 const manifest = parseManifest(await readFile(new URL('../../data/comparison.json', import.meta.url), 'utf8'));
 const request = {
