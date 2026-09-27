@@ -71,6 +71,13 @@ file before polling or admitting it. Admission uses per-file atomic writes for
 the MP4, poster, sanitized receipt, and generated ledger state; the validator
 is the consistency check after an interrupted admission.
 
+Admission requires a successful local `ffprobe` inspection. The `import` flags
+`--width`, `--height`, `--duration-milliseconds`, `--frame-rate-millihertz`,
+`--codec`, `--audio`, `--audio-codec`, `--decode-tool`, and `--decode-version`
+are recorded only as operator notes in the private `admission.json`. Admission
+never consults those notes: media facts and the recorded `full_decode` tool and
+version come from the local inspection.
+
 ## Model and rights boundary
 
 The requested model belongs to the route. A served model is recorded only when

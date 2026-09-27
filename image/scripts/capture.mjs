@@ -512,7 +512,7 @@ async function importOperationUnlocked(operationPath, sourceFile) {
   const directory = path.resolve(operationPath);
   assertInside(OPERATIONS_ROOT, directory, 'operation directory');
   const state = await readJson(statePath(directory));
-  if (!['reserved', 'submitted', 'ambiguous', 'downloaded'].includes(state.phase)) throw new Error(`cannot import into ${state.phase} operation`);
+  if (!['reserved', 'submitting', 'submitted', 'ambiguous', 'downloaded'].includes(state.phase)) throw new Error(`cannot import into ${state.phase} operation`);
   const source = path.resolve(sourceFile);
   const sourceBytes = await fs.readFile(source);
   if (!sourceBytes.length || sourceBytes.length >= MAX_BYTES) throw new Error('imported image is empty or exceeds 25 MiB');
@@ -842,9 +842,8 @@ async function reconcileOperation(operationPath, options) {
     const state = await readJson(statePath(directory));
     if (!['ambiguous', 'submitting', 'reserved', 'submitted'].includes(state.phase)) throw new Error(`cannot reconcile ${state.phase} operation`);
     if (options.file) {
-      // Import performs its own header and size checks; release first to avoid nested lock acquisition.
-      state.phase = ['ambiguous', 'submitting'].includes(state.phase) ? 'reserved' : state.phase;
-      await writeState(directory, state);
+      // Keep the uncertain state and lock until the checked import is committed.
+      return await importOperationUnlocked(directory, path.resolve(options.file));
     } else if (options.remoteJobRef) {
       const remoteJobRef = String(options.remoteJobRef);
       if (!/^[A-Za-z0-9._:-]{1,200}$/.test(remoteJobRef)) throw new Error('remote job reference contains unsupported characters');
@@ -859,8 +858,6 @@ async function reconcileOperation(operationPath, options) {
   } finally {
     await release();
   }
-  if (options.file) return importOperation(directory, path.resolve(options.file));
-  return readJson(statePath(directory));
 }
 
 function parseArgs(argv) {
