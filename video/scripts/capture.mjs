@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { copyFile, mkdir, readFile, rename, rm, rmdir, unlink, writeFile } from "node:fs/promises";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join, resolve, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -339,6 +339,53 @@ async function acquireLock(operationDir) {
   throw new Error("could not acquire operation lock");
 }
 
+/**
+ * Serialize admission and recovery while the per-operation lock is held.
+ * Age is not proof of abandonment: only a quiescent operator removes crash locks.
+ */
+async function acquirePublicationLock(repositoryRoot) {
+  const privateRoot = join(fileURLToPathIfUrl(repositoryRoot), ".work");
+  await mkdir(privateRoot, { recursive: true, mode: 0o700 });
+  const lock = join(privateRoot, "publication.lock");
+  const waitBudget = Number(process.env.CAPTURE_PUBLICATION_WAIT_MS ?? 120_000);
+  if (!Number.isFinite(waitBudget) || waitBudget < 0) throw new Error("CAPTURE_PUBLICATION_WAIT_MS must be finite and nonnegative");
+  const started = Date.now();
+  for (;;) {
+    try {
+      await mkdir(lock, { mode: 0o700 });
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      if (Date.now() - started >= waitBudget) throw new Error("gallery publication is already in progress; retry admit, or inspect an abandoned lock after stopping all publishers");
+      await new Promise((resolveWait) => setTimeout(resolveWait, 75));
+      continue;
+    }
+    const owner = join(lock, "owner-" + randomUUID());
+    try {
+      await writeFile(owner, String(process.pid) + "\n", { flag: "wx", mode: 0o600 });
+    } catch (error) {
+      // Remove only an empty directory; never recursively erase another owner.
+      await rmdir(lock).catch(() => {});
+      throw error;
+    }
+    let released = false;
+    return async () => {
+      if (released) return;
+      released = true;
+      try {
+        await unlink(owner);
+      } catch (error) {
+        if (error.code === "ENOENT") return;
+        throw error;
+      }
+      try {
+        await rmdir(lock);
+      } catch (error) {
+        if (!["ENOENT", "ENOTEMPTY"].includes(error.code)) throw error;
+      }
+    };
+  }
+}
+
 async function reserveInternal(request, privateRoot = PRIVATE_ROOT) {
   const root = fileURLToPathIfUrl(privateRoot);
   const key = operationKey(request);
@@ -672,7 +719,9 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
   const operationDir = fileURLToPathIfUrl(operationDirInput);
   const root = fileURLToPathIfUrl(repositoryRoot);
   const release = await acquireLock(operationDir);
+  let releasePublication;
   try {
+    releasePublication = await acquirePublicationLock(root);
     const state = await readJson(join(operationDir, "state.json"));
     if (state.phase === "admitted") {
       try {
@@ -786,7 +835,11 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
     await atomicJson(join(operationDir, "state.json"), admitted);
     return { state: admitted, asset: assetRelative, poster: posterRelative, receipt: receiptRelative };
   } finally {
-    await release();
+    try {
+      if (releasePublication) await releasePublication();
+    } finally {
+      await release();
+    }
   }
 }
 

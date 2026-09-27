@@ -161,6 +161,53 @@ async function acquireLock(operationDirectoryValue) {
   throw new Error('could not acquire operation lock');
 }
 
+/**
+ * Serialize admission and recovery while the per-operation lock is held.
+ * Age is not proof of abandonment: only a quiescent operator removes crash locks.
+ */
+async function acquirePublicationLock(repositoryRoot) {
+  const privateRoot = path.join(path.resolve(repositoryRoot), '.work');
+  await fs.mkdir(privateRoot, { recursive: true, mode: 0o700 });
+  const lock = path.join(privateRoot, 'publication.lock');
+  const waitBudget = Number(process.env.CAPTURE_PUBLICATION_WAIT_MS ?? 120_000);
+  if (!Number.isFinite(waitBudget) || waitBudget < 0) throw new Error('CAPTURE_PUBLICATION_WAIT_MS must be finite and nonnegative');
+  const started = Date.now();
+  for (;;) {
+    try {
+      await fs.mkdir(lock, { mode: 0o700 });
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      if (Date.now() - started >= waitBudget) throw new Error('gallery publication is already in progress; retry admit, or inspect an abandoned lock after stopping all publishers');
+      await new Promise((resolveWait) => setTimeout(resolveWait, 75));
+      continue;
+    }
+    const owner = path.join(lock, 'owner-' + crypto.randomUUID());
+    try {
+      await fs.writeFile(owner, String(process.pid) + '\n', { flag: 'wx', mode: 0o600 });
+    } catch (error) {
+      // Remove only an empty directory; never recursively erase another owner.
+      await fs.rmdir(lock).catch(() => {});
+      throw error;
+    }
+    let released = false;
+    return async () => {
+      if (released) return;
+      released = true;
+      try {
+        await fs.unlink(owner);
+      } catch (error) {
+        if (error.code === 'ENOENT') return;
+        throw error;
+      }
+      try {
+        await fs.rmdir(lock);
+      } catch (error) {
+        if (!['ENOENT', 'ENOTEMPTY'].includes(error.code)) throw error;
+      }
+    };
+  }
+}
+
 function publicRequestShape(request) {
   return {
     repository: request.repository,
@@ -752,7 +799,9 @@ export async function admitOperation(operationPath, repositoryRoot = REPOSITORY_
   const directory = path.resolve(operationPath);
   assertInside(OPERATIONS_ROOT, directory, 'operation directory');
   const release = await acquireLock(directory);
+  let releasePublication;
   try {
+    releasePublication = await acquirePublicationLock(repositoryRoot);
     const state = await readJson(statePath(directory));
     if (!['downloaded', 'admitted'].includes(state.phase)) throw new Error(`operation must be downloaded before admission (currently ${state.phase})`);
     const manifest = parseManifest(await fs.readFile(path.resolve(repositoryRoot, 'data/comparison.json'), 'utf8'));
@@ -830,7 +879,11 @@ export async function admitOperation(operationPath, repositoryRoot = REPOSITORY_
     await writeState(directory, state);
     return state;
   } finally {
-    await release();
+    try {
+      if (releasePublication) await releasePublication();
+    } finally {
+      await release();
+    }
   }
 }
 
