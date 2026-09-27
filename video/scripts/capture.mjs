@@ -768,7 +768,9 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
     transport: { status_code: 200, media_content_type: "video/mp4" },
     served_model: generated.served_model,
     cost: generated.cost,
-    response_media_sha256: generated.asset.sha256,
+    response_media_sha256: generated.asset.provenance.kind === "web-derivative"
+      ? generated.asset.provenance.source_sha256
+      : generated.asset.sha256,
   };
   const receiptBytes = Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8");
   generated.receipt_sha256 = sha256(receiptBytes);

@@ -43,6 +43,11 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           for file in assets/*.js scripts/validate.mjs scripts/capture.mjs; do node --check "$file"; done
+      - name: Install video inspection tools
+        if: matrix.gallery == 'video'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
       - name: Validate authoring projection
         run: node scripts/validate.mjs --mode authoring
       - name: Run offline smoke fixture
