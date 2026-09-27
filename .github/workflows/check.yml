@@ -31,3 +31,5 @@ jobs:
         run: node scripts/validate.mjs --mode authoring
       - name: Run offline smoke fixture
         run: node scripts/fixtures/smoke.mjs
+      - name: Run Python test locks
+        run: python3 -m unittest discover -s test -p 'test_*.py'
