@@ -563,7 +563,7 @@ function operationKeyFromArgument(value) {
 async function importFileUnlocked(operationDir, sourcePath, posterSource, metadata) {
   const statePath = join(operationDir, "state.json");
   const state = await readJson(statePath);
-  if (!["reserved", "submitted", "ambiguous", "downloaded"].includes(state.phase)) throw new Error(`cannot import into ${state.phase} operation`);
+  if (!["reserved", "submitting", "submitted", "ambiguous", "downloaded"].includes(state.phase)) throw new Error(`cannot import into ${state.phase} operation`);
   const source = resolve(sourcePath);
   const sourceInfo = lstatSync(source);
   if (!sourceInfo.isFile() || sourceInfo.isSymbolicLink()) throw new Error("import source must be a regular non-symlink file");
@@ -579,7 +579,6 @@ async function importFileUnlocked(operationDir, sourcePath, posterSource, metada
     file: basename(rawFile),
     content_type: extension === ".webm" ? "video/webm" : "video/mp4",
   };
-  await atomicJson(statePath, sanitizeOperationState(next));
   if (posterSource) {
     const poster = resolve(posterSource);
     const posterInfo = lstatSync(poster);
@@ -587,6 +586,7 @@ async function importFileUnlocked(operationDir, sourcePath, posterSource, metada
     await copyFile(poster, join(operationDir, "poster.webp"));
   }
   await atomicJson(join(operationDir, "admission.json"), metadata || {});
+  await atomicJson(statePath, sanitizeOperationState(next));
   return next;
 }
 
@@ -856,14 +856,12 @@ async function commandReconcile(args) {
       return;
     }
     if (!args.flags.file) throw new Error("reconcile requires --remote-job-ref or --file");
-    if (state.phase === "ambiguous" || state.phase === "submitting") {
-      await atomicJson(statePath, { ...state, phase: "reserved", reason: undefined });
-    }
+    // Hold the lock and uncertain state until every local import step succeeds.
+    const result = await importFileUnlocked(dir, args.flags.file, args.flags.poster, {});
+    process.stdout.write(`reconciled to ${result.phase}; admit after review\n`);
   } finally {
     await release();
   }
-  const result = await importFile(dir, args.flags.file, args.flags.poster, {});
-  process.stdout.write(`reconciled to ${result.phase}; admit after review\n`);
 }
 
 function printHelp() {
