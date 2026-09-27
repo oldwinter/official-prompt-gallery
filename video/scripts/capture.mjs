@@ -493,8 +493,10 @@ export function sanitizeReceipt(result, operation) {
 }
 
 function inspectWithFfprobe(filePath) {
-  const available = spawnSync("ffprobe", ["-version"], { stdio: "ignore", timeout: 3000 });
-  if (available.error || available.status !== 0) return null;
+  const available = spawnSync("ffprobe", ["-version"], { encoding: "utf8", timeout: 3000 });
+  if (available.error || available.status !== 0) throw new Error("admission requires ffprobe; install it and ensure ffprobe -version succeeds");
+  const version = available.stdout.match(/^ffprobe version (\S+)/)?.[1];
+  if (!version) throw new Error("ffprobe returned an invalid version");
   const result = spawnSync("ffprobe", ["-v", "error", "-print_format", "json", "-show_streams", "-show_format", filePath], { encoding: "utf8", timeout: 20000 });
   if (result.error || result.status !== 0) throw new Error("ffprobe could not decode the imported video");
   let parsed;
@@ -503,21 +505,29 @@ function inspectWithFfprobe(filePath) {
   } catch {
     throw new Error("ffprobe returned invalid JSON");
   }
-  const video = parsed.streams?.find((stream) => stream.codec_type === "video");
-  if (!video) throw new Error("imported file has no video stream");
-  const duration = Number(video.duration ?? parsed.format?.duration);
-  const [numerator, denominator] = String(video.avg_frame_rate || video.r_frame_rate || "0/1").split("/").map(Number);
-  return {
+  if (!Array.isArray(parsed?.streams) || parsed.streams.some((stream) => !stream || typeof stream !== "object" || Array.isArray(stream))) throw new Error("ffprobe returned invalid streams");
+  const video = parsed.streams.find((stream) => stream.codec_type === "video");
+  if (!video) throw new Error("ffprobe found no video stream in the imported file");
+  const audio = parsed.streams.find((stream) => stream.codec_type === "audio");
+  for (const stream of [video, audio].filter(Boolean)) {
+    if (typeof stream.codec_name !== "string" || !stream.codec_name.trim() || stream.codec_name === "unknown") throw new Error("ffprobe returned an invalid codec");
+  }
+  const durationValue = video.duration ?? parsed.format?.duration;
+  const duration = ["number", "string"].includes(typeof durationValue) ? Number(durationValue) : NaN;
+  const frameRate = video.avg_frame_rate || video.r_frame_rate;
+  if (typeof frameRate !== "string" || !/^\d+\/[1-9]\d*$/.test(frameRate)) throw new Error("ffprobe returned an invalid frame rate");
+  const [numerator, denominator] = frameRate.split("/").map(Number);
+  const facts = {
     container: "mp4",
-    codec: String(video.codec_name || "unknown"),
-    width: Number(video.width),
-    height: Number(video.height),
+    codec: video.codec_name,
+    width: video.width,
+    height: video.height,
     duration_milliseconds: Math.round(duration * 1000),
-    frame_rate_millihertz: Math.round((denominator ? numerator / denominator : 0) * 1000),
-    audio: parsed.streams?.some((stream) => stream.codec_type === "audio")
-      ? { kind: "present", codec: String(parsed.streams.find((stream) => stream.codec_type === "audio").codec_name || "unknown") }
-      : { kind: "absent" },
+    frame_rate_millihertz: Math.round((numerator / denominator) * 1000),
+    audio: audio ? { kind: "present", codec: audio.codec_name } : { kind: "absent" },
   };
+  if (![facts.width, facts.height, facts.duration_milliseconds, facts.frame_rate_millihertz].every((value) => Number.isSafeInteger(value) && value > 0)) throw new Error("ffprobe media facts must be finite positive integers");
+  return { facts, fullDecode: { tool: "ffprobe", version } };
 }
 
 function dateOnly(value = now()) {
@@ -700,17 +710,7 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
   if (posterBytes.length >= 25 * 1024 * 1024) throw new Error("poster must be strictly smaller than 25 MiB");
   if (posterBytes.subarray(0, 4).toString("ascii") !== "RIFF" || posterBytes.subarray(8, 12).toString("ascii") !== "WEBP") throw new Error("poster must be a WebP file");
   const metadata = existsSync(join(operationDir, "admission.json")) ? await readJson(join(operationDir, "admission.json")) : {};
-  const ffprobeFacts = inspectWithFfprobe(rawPath);
-  const facts = ffprobeFacts || {
-    container: "mp4",
-    codec: metadata.codec || "unverified",
-    width: Number(metadata.width || 1),
-    height: Number(metadata.height || 1),
-    duration_milliseconds: Number(metadata.duration_milliseconds || 5000),
-    frame_rate_millihertz: Number(metadata.frame_rate_millihertz || 24000),
-    audio: metadata.audio === "present" ? { kind: "present", codec: metadata.audio_codec || "unknown" } : { kind: "absent" },
-  };
-  if (facts.width <= 0 || facts.height <= 0 || facts.duration_milliseconds <= 0 || facts.frame_rate_millihertz <= 0) throw new Error("admission media facts must be positive");
+  const { facts, fullDecode } = inspectWithFfprobe(rawPath);
   if (!metadata.reviewed_on || !ISO_INSTANT_PATTERN.test(`${metadata.reviewed_on}T00:00:00.000Z`)) throw new Error("admit requires reviewed_on=YYYY-MM-DD in admission metadata");
   const providerEvidence = existsSync(join(operationDir, "provider-evidence.json")) ? await readJson(join(operationDir, "provider-evidence.json")) : {};
   const routeId = requestRecord.route_id;
@@ -753,7 +753,7 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
     receipt_sha256: "0".repeat(64),
     alt_text: metadata.alt_text || `${EXPECTED_MODELS[routeId].label} output for the ${manifest.cases[caseId].title.toLowerCase()} prompt.`,
     admission: {
-      full_decode: { tool: metadata.decode_tool || (ffprobeFacts ? "ffprobe" : "operator-provided decode"), version: metadata.decode_version || "recorded at admission" },
+      full_decode: fullDecode,
       nonblank_review: { kind: "human-reviewed", reviewed_on: metadata.reviewed_on },
     },
   };
