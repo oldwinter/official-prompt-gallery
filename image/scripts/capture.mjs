@@ -10,7 +10,8 @@ import {
   inspectImageHeader,
   mediaPath,
   parseManifest,
-  receiptPath
+  receiptPath,
+  validateHtmlProjection
 } from './validate.mjs';
 
 const execFile = promisify(execFileCallback);
@@ -161,39 +162,49 @@ async function acquireLock(operationDirectoryValue) {
 }
 
 /**
- * Serialize the shared manifest/HTML read-modify-write phase of admission.
- * Always taken while holding an operation lock, never the other way around.
+ * Serialize admission and recovery while the per-operation lock is held.
+ * Age is not proof of abandonment: only a quiescent operator removes crash locks.
  */
 async function acquirePublicationLock(repositoryRoot) {
   const privateRoot = path.join(path.resolve(repositoryRoot), '.work');
   await fs.mkdir(privateRoot, { recursive: true, mode: 0o700 });
-  const lockPath = path.join(privateRoot, 'publication.lock');
-  const staleAfter = Math.max(60_000, Number(process.env.CAPTURE_LOCK_STALE_MS || 6 * 60 * 60 * 1000));
-  const waitBudget = Math.max(0, Number(process.env.CAPTURE_PUBLICATION_WAIT_MS || 120_000));
+  const lock = path.join(privateRoot, 'publication.lock');
+  const waitBudget = Number(process.env.CAPTURE_PUBLICATION_WAIT_MS ?? 120_000);
+  if (!Number.isFinite(waitBudget) || waitBudget < 0) throw new Error('CAPTURE_PUBLICATION_WAIT_MS must be finite and nonnegative');
   const started = Date.now();
   for (;;) {
     try {
-      const handle = await fs.open(lockPath, 'wx', 0o600);
-      await handle.writeFile(`${process.pid}\n`, 'utf8');
-      return async function release() {
-        await handle.close().catch(() => {});
-        await fs.rm(lockPath, { force: true }).catch(() => {});
-      };
+      await fs.mkdir(lock, { mode: 0o700 });
     } catch (error) {
       if (error.code !== 'EEXIST') throw error;
-      try {
-        const info = await fs.stat(lockPath);
-        if (Date.now() - info.mtimeMs > staleAfter) {
-          await fs.rm(lockPath, { force: true });
-          continue;
-        }
-      } catch (statError) {
-        if (statError.code !== 'ENOENT') throw statError;
-        continue;
-      }
-      if (Date.now() - started > waitBudget) throw new Error('gallery publication is already in progress; retry admit');
+      if (Date.now() - started >= waitBudget) throw new Error('gallery publication is already in progress; retry admit, or inspect an abandoned lock after stopping all publishers');
       await new Promise((resolveWait) => setTimeout(resolveWait, 75));
+      continue;
     }
+    const owner = path.join(lock, 'owner-' + crypto.randomUUID());
+    try {
+      await fs.writeFile(owner, String(process.pid) + '\n', { flag: 'wx', mode: 0o600 });
+    } catch (error) {
+      // Remove only an empty directory; never recursively erase another owner.
+      await fs.rmdir(lock).catch(() => {});
+      throw error;
+    }
+    let released = false;
+    return async () => {
+      if (released) return;
+      released = true;
+      try {
+        await fs.unlink(owner);
+      } catch (error) {
+        if (error.code === 'ENOENT') return;
+        throw error;
+      }
+      try {
+        await fs.rmdir(lock);
+      } catch (error) {
+        if (!['ENOENT', 'ENOTEMPTY'].includes(error.code)) throw error;
+      }
+    };
   }
 }
 
@@ -548,7 +559,7 @@ async function importOperationUnlocked(operationPath, sourceFile) {
   const directory = path.resolve(operationPath);
   assertInside(OPERATIONS_ROOT, directory, 'operation directory');
   const state = await readJson(statePath(directory));
-  if (!['reserved', 'submitted', 'ambiguous', 'downloaded'].includes(state.phase)) throw new Error(`cannot import into ${state.phase} operation`);
+  if (!['reserved', 'submitting', 'submitted', 'ambiguous', 'downloaded'].includes(state.phase)) throw new Error(`cannot import into ${state.phase} operation`);
   const source = path.resolve(sourceFile);
   const sourceBytes = await fs.readFile(source);
   if (!sourceBytes.length || sourceBytes.length >= MAX_BYTES) throw new Error('imported image is empty or exceeds 25 MiB');
@@ -718,7 +729,7 @@ async function updateManifest(state, publicHash, publicBytes, facts, receiptHash
   const manifest = parseManifest(await fs.readFile(manifestPath, 'utf8'));
   const sample = manifest.samples[state.case_id]?.[state.route_id];
   if (!sample) throw new Error('operation references an unknown manifest cell');
-  if (sample.state.kind === 'generated') return manifest;
+  if (sample.state.kind !== 'planned') throw new Error('manifest cell is no longer planned for this operation');
   const next = JSON.parse(JSON.stringify(manifest));
   const target = next.samples[state.case_id][state.route_id];
   target.state = { kind: 'generated', request_sha256: state.request_sha256 };
@@ -747,47 +758,90 @@ async function updateManifest(state, publicHash, publicBytes, facts, receiptHash
   return next;
 }
 
-function assertAdmissionEligible(manifest, state) {
-  const expectedRequest = requestFor(manifest, state.case_id, state.route_id);
-  if (operationKey(expectedRequest) !== state.request_sha256) throw new Error('operation key does not match the current manifest request');
-  if (manifest.samples[state.case_id][state.route_id].state.kind !== 'planned') throw new Error('manifest cell is no longer planned for this operation');
-  if (!hasExactServedModel(manifest.routes[state.route_id], state.served_model)) {
-    throw new Error('exact-model admission requires matching provider-reported served identity');
+async function verifyPublishedAdmission(state, cell, repositoryRoot) {
+  if (cell.state.request_sha256 !== state.request_sha256) throw new Error('generated cell belongs to a different operation');
+  const media = await fs.readFile(path.resolve(repositoryRoot, mediaPath('image', state.case_id, state.route_id)));
+  const receiptBytes = await fs.readFile(path.resolve(repositoryRoot, receiptPath(state.case_id, state.route_id)));
+  if (sha256(media) !== cell.asset.sha256 || media.length !== cell.asset.bytes || sha256(receiptBytes) !== cell.receipt_sha256) {
+    throw new Error('generated evidence does not match public hashes');
   }
+  if ((state.public_sha256 && state.public_sha256 !== cell.asset.sha256) ||
+      (state.public_receipt_sha256 && state.public_receipt_sha256 !== cell.receipt_sha256)) {
+    throw new Error('generated evidence conflicts with private admission hashes');
+  }
+  const sourceHash = cell.asset.provenance.kind === 'web-derivative' ? cell.asset.provenance.source_sha256 : cell.asset.sha256;
+  if (!isHash(state.raw_sha256) || sourceHash !== state.raw_sha256) throw new Error('generated evidence does not match the downloaded source');
+  const facts = inspectImageHeader(media);
+  if (facts.animated || ['format', 'width', 'height', 'alpha'].some((key) => facts[key] !== cell.media_facts[key])) {
+    throw new Error('generated media facts do not match public bytes');
+  }
+  const receipt = JSON.parse(receiptBytes.toString('utf8'));
+  if (!INSTANT_PATTERN.test(receipt.completed_at) ||
+      canonicalJson(receipt) !== canonicalJson(receiptFor(state, cell.asset.sha256, receipt.completed_at, 'image/webp')) ||
+      canonicalJson(cell.served_model) !== canonicalJson(receipt.served_model) ||
+      canonicalJson(cell.cost) !== canonicalJson(receipt.cost)) {
+    throw new Error('generated receipt does not match the operation');
+  }
+  return receipt;
+}
+
+async function projectAdmission(state, manifest, repositoryRoot) {
+  const htmlPath = path.resolve(repositoryRoot, 'index.html');
+  const pattern = new RegExp(`<figure\\b[^>]*data-case-id="${state.case_id}"[^>]*data-route-id="${state.route_id}"[^>]*data-state="generated"`, 'i');
+  const projectionMatches = (html) => pattern.test(html) && !validateHtmlProjection(html, manifest)
+    .some((finding) => finding.path === `index.html:${state.case_id}--${state.route_id}` || finding.code === 'html-cross-product');
+  if (projectionMatches(await fs.readFile(htmlPath, 'utf8'))) return;
+  await updateHtmlState(state.case_id, state.route_id, 'generated', repositoryRoot, manifest.samples[state.case_id][state.route_id].media_facts);
+  if (!projectionMatches(await fs.readFile(htmlPath, 'utf8'))) throw new Error('admitted operation has an incomplete HTML projection');
 }
 
 export async function admitOperation(operationPath, repositoryRoot = REPOSITORY_ROOT, options = {}) {
   const directory = path.resolve(operationPath);
   assertInside(OPERATIONS_ROOT, directory, 'operation directory');
   const release = await acquireLock(directory);
+  let releasePublication;
   try {
+    releasePublication = await acquirePublicationLock(repositoryRoot);
     const state = await readJson(statePath(directory));
-    if (state.phase === 'admitted') {
-      try {
-        const manifest = await loadManifest();
-        const cell = manifest.samples[state.case_id]?.[state.route_id];
-        const media = path.resolve(repositoryRoot, mediaPath('image', state.case_id, state.route_id));
-        const receipt = path.resolve(repositoryRoot, receiptPath(state.case_id, state.route_id));
-        if (!cell || cell.state.kind !== 'generated' || !cell.asset || !cell.receipt_sha256 || !await fs.stat(media).catch(() => null) || !await fs.stat(receipt).catch(() => null)) throw new Error('admitted operation has an incomplete public projection');
-        if (sha256(await fs.readFile(media)) !== cell.asset.sha256 || sha256(await fs.readFile(receipt)) !== cell.receipt_sha256) throw new Error('admitted operation does not match public hashes');
-        const html = await fs.readFile(path.resolve(repositoryRoot, 'index.html'), 'utf8');
-        const pattern = new RegExp(`<figure\\b[^>]*data-case-id="${state.case_id}"[^>]*data-route-id="${state.route_id}"[^>]*data-state="generated"`, 'i');
-        if (!pattern.test(html)) throw new Error('admitted operation has an out-of-date HTML projection');
+    if (!['downloaded', 'admitted'].includes(state.phase)) throw new Error(`operation must be downloaded before admission (currently ${state.phase})`);
+    const manifest = parseManifest(await fs.readFile(path.resolve(repositoryRoot, 'data/comparison.json'), 'utf8'));
+    const expectedRequest = requestFor(manifest, state.case_id, state.route_id);
+    if (operationKey(expectedRequest) !== state.request_sha256 || state.operation_key !== state.request_sha256 ||
+        canonicalJson(state.request) !== canonicalJson(publicRequestShape(expectedRequest))) {
+      throw new Error('operation key does not match the current manifest request');
+    }
+    const cell = manifest.samples[state.case_id][state.route_id];
+    if (!hasExactServedModel(manifest.routes[state.route_id], state.served_model)) {
+      throw new Error('exact-model admission requires matching provider-reported served identity');
+    }
+    if (cell.state.kind === 'generated') {
+      const receipt = await verifyPublishedAdmission(state, cell, repositoryRoot);
+      if (options.dryRun) {
+        console.log(JSON.stringify({ operation_key: state.operation_key, phase: state.phase, next: 'recover published admission projection' }));
         return state;
-      } catch {
-        state.phase = 'downloaded';
+      }
+      await projectAdmission(state, manifest, repositoryRoot);
+      if (state.phase !== 'admitted') {
+        state.phase = 'admitted';
+        state.public_sha256 = cell.asset.sha256;
+        state.public_bytes = cell.asset.bytes;
+        state.public_media = mediaPath('image', state.case_id, state.route_id);
+        state.public_receipt = receiptPath(state.case_id, state.route_id);
+        state.public_receipt_sha256 = cell.receipt_sha256;
+        state.completed_at = receipt.completed_at;
         await writeState(directory, state);
       }
+      return state;
     }
-    if (state.phase !== 'downloaded') throw new Error(`operation must be downloaded before admission (currently ${state.phase})`);
+    if (state.phase === 'admitted') throw new Error('admitted operation has no generated manifest cell');
     const sourcePath = sourcePathFromState(directory, state);
     const sourceBytes = await fs.readFile(sourcePath);
+    if (sha256(sourceBytes) !== state.raw_sha256) throw new Error('private source does not match the downloaded hash');
     const sourceHeader = inspectImageHeader(sourceBytes);
     if (sourceHeader.format === 'unknown' || sourceHeader.animated) throw new Error('private source is not a supported non-animated image');
     const reviewDate = options.reviewedOn || process.env.IMAGE_REVIEWED_ON;
     if (!isDate(reviewDate)) throw new Error('admission requires --reviewed-on YYYY-MM-DD or IMAGE_REVIEWED_ON');
     if (options.dryRun) {
-      assertAdmissionEligible(await loadManifest(), state);
       console.log(JSON.stringify({ operation_key: state.operation_key, phase: state.phase, source_sha256: sha256(sourceBytes), next: 'promote WebP after human review' }));
       return state;
     }
@@ -802,33 +856,34 @@ export async function admitOperation(operationPath, repositoryRoot = REPOSITORY_
     const relativeMedia = mediaPath('image', state.case_id, state.route_id);
     const publicMediaPath = path.resolve(repositoryRoot, relativeMedia);
     assertInside(path.resolve(repositoryRoot), publicMediaPath, 'public media path');
+    await atomicCopy(derivative.path, publicMediaPath);
     const completedAt = now();
     const receipt = receiptFor(state, publicHash, completedAt, 'image/webp');
     const receiptBytes = Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
     const receiptHash = sha256(receiptBytes);
     const publicReceiptPath = path.resolve(repositoryRoot, receiptPath(state.case_id, state.route_id));
     assertInside(path.resolve(repositoryRoot), publicReceiptPath, 'public receipt path');
-    const releasePublication = await acquirePublicationLock(repositoryRoot);
-    try {
-      const lockedManifestPath = path.join(path.resolve(repositoryRoot), 'data/comparison.json');
-      assertAdmissionEligible(parseManifest(await fs.readFile(lockedManifestPath, 'utf8')), state);
-      await atomicCopy(derivative.path, publicMediaPath);
-      await atomicWrite(publicReceiptPath, receiptBytes.toString('utf8'), 0o644);
-      await updateManifest(state, publicHash, publicBytes.length, facts, receiptHash, { provenance: derivative.provenance, decode, reviewed_on: reviewDate }, repositoryRoot);
-      state.phase = 'admitted';
-      state.public_sha256 = publicHash;
-      state.public_bytes = publicBytes.length;
-      state.public_media = relativeMedia;
-      state.public_receipt = receiptPath(state.case_id, state.route_id);
-      state.completed_at = completedAt;
-      await writeState(directory, state);
-      await updateHtmlState(state.case_id, state.route_id, 'generated', repositoryRoot, facts);
-      return state;
-    } finally {
-      await releasePublication();
-    }
+    await atomicWrite(publicReceiptPath, receiptBytes.toString('utf8'), 0o644);
+    // Persist recovery hashes before publishing the generated manifest. Keep the
+    // operation downloaded until every public projection has succeeded.
+    state.public_sha256 = publicHash;
+    state.public_bytes = publicBytes.length;
+    state.public_media = relativeMedia;
+    state.public_receipt = receiptPath(state.case_id, state.route_id);
+    state.public_receipt_sha256 = receiptHash;
+    await writeState(directory, state);
+    const generatedManifest = await updateManifest(state, publicHash, publicBytes.length, facts, receiptHash, { provenance: derivative.provenance, decode, reviewed_on: reviewDate }, repositoryRoot);
+    await projectAdmission(state, generatedManifest, repositoryRoot);
+    state.phase = 'admitted';
+    state.completed_at = completedAt;
+    await writeState(directory, state);
+    return state;
   } finally {
-    await release();
+    try {
+      if (releasePublication) await releasePublication();
+    } finally {
+      await release();
+    }
   }
 }
 
@@ -840,9 +895,8 @@ async function reconcileOperation(operationPath, options) {
     const state = await readJson(statePath(directory));
     if (!['ambiguous', 'submitting', 'reserved', 'submitted'].includes(state.phase)) throw new Error(`cannot reconcile ${state.phase} operation`);
     if (options.file) {
-      // Import performs its own header and size checks; release first to avoid nested lock acquisition.
-      state.phase = ['ambiguous', 'submitting'].includes(state.phase) ? 'reserved' : state.phase;
-      await writeState(directory, state);
+      // Keep the uncertain state and lock until the checked import is committed.
+      return await importOperationUnlocked(directory, path.resolve(options.file));
     } else if (options.remoteJobRef) {
       const remoteJobRef = String(options.remoteJobRef);
       if (!/^[A-Za-z0-9._:-]{1,200}$/.test(remoteJobRef)) throw new Error('remote job reference contains unsupported characters');
@@ -857,8 +911,6 @@ async function reconcileOperation(operationPath, options) {
   } finally {
     await release();
   }
-  if (options.file) return importOperation(directory, path.resolve(options.file));
-  return readJson(statePath(directory));
 }
 
 function parseArgs(argv) {

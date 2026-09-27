@@ -71,6 +71,28 @@ file before polling or admitting it. Admission uses per-file atomic writes for
 the MP4, poster, sanitized receipt, and generated ledger state; the validator
 is the consistency check after an interrupted admission.
 
+Admission requires a successful local `ffprobe` inspection. The `import` flags
+`--width`, `--height`, `--duration-milliseconds`, `--frame-rate-millihertz`,
+`--codec`, `--audio`, `--audio-codec`, `--decode-tool`, and `--decode-version`
+are recorded only as operator notes in the private `admission.json`. Admission
+never consults those notes: media facts and the recorded `full_decode` tool and
+version come from the local inspection.
+
+### Concurrent admission and crash recovery
+
+Admissions and public-projection recovery hold a gallery-wide
+`.work/publication.lock` while the operation lock is held. Contenders wait up to
+`CAPTURE_PUBLICATION_WAIT_MS` (default 120000) and then report the gallery busy.
+Publication locks never expire automatically: age does not prove that a publisher
+has stopped. Each publisher releases only its unique owner marker and an empty
+lock directory.
+
+After a crashed publisher, stop all capture processes for that gallery before
+removing only `.work/publication.lock` (including a legacy lock file). Preserve
+`.work/operations/` and retry the same `admit` operation; do not submit generation
+again to clear a publication lock. Never remove a lock while a publisher may
+still be running.
+
 ## Model and rights boundary
 
 The requested model belongs to the route. A served model is recorded only when

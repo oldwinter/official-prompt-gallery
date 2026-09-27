@@ -28,13 +28,11 @@ SERVED_MODEL = {
     "receipt_field": "model",
 }
 
-# ffprobe substitute: exiting 1 makes commandAvailable() report ffprobe as
-# unavailable, so admission falls back to operator-provided metadata.
-FFPROBE_STUB = "#!/bin/sh\nexit 1\n"
-
-
-def fake_mp4(tag: bytes) -> bytes:
-    return b"\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isomiso2mp41" + b"\x00\x00\x00\x08free" + tag
+# Reuse checked-in media so mandatory ffprobe inspection remains exercised.
+SOURCE_MEDIA = {
+    "minimax-official-01": "media/minimax-official-01--minimax-h3.mp4",
+    "xai-official-01": "media/xai-official-01--minimax-h3.mp4",
+}
 
 
 def sha256_of(path: Path) -> str:
@@ -59,15 +57,10 @@ class AdmissionConcurrencyTests(unittest.TestCase):
         ignore = shutil.ignore_patterns(".work", ".git", "__pycache__", "*.pyc")
         shutil.copytree(ROOT, self.repo, ignore=ignore)
         self._inject_admission_delay()
-        self.stub_bin = self.workdir / "bin"
-        self.stub_bin.mkdir()
-        stub = self.stub_bin / "ffprobe"
-        stub.write_text(FFPROBE_STUB)
-        stub.chmod(0o755)
         self.sources = self.workdir / "sources"
         self.sources.mkdir()
-        for index, (case_id, _) in enumerate(PLANNED_CELLS):
-            (self.sources / f"{case_id}.mp4").write_bytes(fake_mp4(f"cell-{index}".encode()))
+        for case_id, _ in PLANNED_CELLS:
+            shutil.copyfile(self.repo / SOURCE_MEDIA[case_id], self.sources / f"{case_id}.mp4")
         self.operations = {
             case_id: self._prepare_operation(case_id)
             for case_id, _ in PLANNED_CELLS
@@ -78,7 +71,6 @@ class AdmissionConcurrencyTests(unittest.TestCase):
 
     def _env(self, **extra: str) -> dict:
         env = dict(os.environ)
-        env["PATH"] = f"{self.stub_bin}{os.pathsep}{env['PATH']}"
         env.update(extra)
         return env
 

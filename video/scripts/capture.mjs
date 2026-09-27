@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { copyFile, mkdir, readFile, rename, rm, rmdir, unlink, writeFile } from "node:fs/promises";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join, resolve, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -340,35 +340,49 @@ async function acquireLock(operationDir) {
 }
 
 /**
- * Serialize the shared manifest/HTML read-modify-write phase of admission.
- * Always taken while holding an operation lock, never the other way around.
+ * Serialize admission and recovery while the per-operation lock is held.
+ * Age is not proof of abandonment: only a quiescent operator removes crash locks.
  */
 async function acquirePublicationLock(repositoryRoot) {
   const privateRoot = join(fileURLToPathIfUrl(repositoryRoot), ".work");
   await mkdir(privateRoot, { recursive: true, mode: 0o700 });
   const lock = join(privateRoot, "publication.lock");
-  const staleAfter = Math.max(60_000, Number(process.env.CAPTURE_LOCK_STALE_MS || 6 * 60 * 60 * 1000));
-  const waitBudget = Math.max(0, Number(process.env.CAPTURE_PUBLICATION_WAIT_MS || 120_000));
+  const waitBudget = Number(process.env.CAPTURE_PUBLICATION_WAIT_MS ?? 120_000);
+  if (!Number.isFinite(waitBudget) || waitBudget < 0) throw new Error("CAPTURE_PUBLICATION_WAIT_MS must be finite and nonnegative");
   const started = Date.now();
   for (;;) {
     try {
-      await mkdir(lock, { recursive: false, mode: 0o700 });
-      await writeFile(join(lock, "owner"), `${process.pid}\n`, { mode: 0o600 });
-      return async () => rm(lock, { recursive: true, force: true });
+      await mkdir(lock, { mode: 0o700 });
     } catch (error) {
       if (error.code !== "EEXIST") throw error;
-      try {
-        if (Date.now() - lstatSync(lock).mtimeMs > staleAfter) {
-          await rm(lock, { recursive: true, force: true });
-          continue;
-        }
-      } catch (statError) {
-        if (statError.code !== "ENOENT") throw statError;
-        continue;
-      }
-      if (Date.now() - started > waitBudget) throw new Error("gallery publication is already in progress; retry admit");
+      if (Date.now() - started >= waitBudget) throw new Error("gallery publication is already in progress; retry admit, or inspect an abandoned lock after stopping all publishers");
       await new Promise((resolveWait) => setTimeout(resolveWait, 75));
+      continue;
     }
+    const owner = join(lock, "owner-" + randomUUID());
+    try {
+      await writeFile(owner, String(process.pid) + "\n", { flag: "wx", mode: 0o600 });
+    } catch (error) {
+      // Remove only an empty directory; never recursively erase another owner.
+      await rmdir(lock).catch(() => {});
+      throw error;
+    }
+    let released = false;
+    return async () => {
+      if (released) return;
+      released = true;
+      try {
+        await unlink(owner);
+      } catch (error) {
+        if (error.code === "ENOENT") return;
+        throw error;
+      }
+      try {
+        await rmdir(lock);
+      } catch (error) {
+        if (!["ENOENT", "ENOTEMPTY"].includes(error.code)) throw error;
+      }
+    };
   }
 }
 
@@ -526,8 +540,10 @@ export function sanitizeReceipt(result, operation) {
 }
 
 function inspectWithFfprobe(filePath) {
-  const available = spawnSync("ffprobe", ["-version"], { stdio: "ignore", timeout: 3000 });
-  if (available.error || available.status !== 0) return null;
+  const available = spawnSync("ffprobe", ["-version"], { encoding: "utf8", timeout: 3000 });
+  if (available.error || available.status !== 0) throw new Error("admission requires ffprobe; install it and ensure ffprobe -version succeeds");
+  const version = available.stdout.match(/^ffprobe version (\S+)/)?.[1];
+  if (!version) throw new Error("ffprobe returned an invalid version");
   const result = spawnSync("ffprobe", ["-v", "error", "-print_format", "json", "-show_streams", "-show_format", filePath], { encoding: "utf8", timeout: 20000 });
   if (result.error || result.status !== 0) throw new Error("ffprobe could not decode the imported video");
   let parsed;
@@ -536,21 +552,29 @@ function inspectWithFfprobe(filePath) {
   } catch {
     throw new Error("ffprobe returned invalid JSON");
   }
-  const video = parsed.streams?.find((stream) => stream.codec_type === "video");
-  if (!video) throw new Error("imported file has no video stream");
-  const duration = Number(video.duration ?? parsed.format?.duration);
-  const [numerator, denominator] = String(video.avg_frame_rate || video.r_frame_rate || "0/1").split("/").map(Number);
-  return {
+  if (!Array.isArray(parsed?.streams) || parsed.streams.some((stream) => !stream || typeof stream !== "object" || Array.isArray(stream))) throw new Error("ffprobe returned invalid streams");
+  const video = parsed.streams.find((stream) => stream.codec_type === "video");
+  if (!video) throw new Error("ffprobe found no video stream in the imported file");
+  const audio = parsed.streams.find((stream) => stream.codec_type === "audio");
+  for (const stream of [video, audio].filter(Boolean)) {
+    if (typeof stream.codec_name !== "string" || !stream.codec_name.trim() || stream.codec_name === "unknown") throw new Error("ffprobe returned an invalid codec");
+  }
+  const durationValue = video.duration ?? parsed.format?.duration;
+  const duration = ["number", "string"].includes(typeof durationValue) ? Number(durationValue) : NaN;
+  const frameRate = video.avg_frame_rate || video.r_frame_rate;
+  if (typeof frameRate !== "string" || !/^\d+\/[1-9]\d*$/.test(frameRate)) throw new Error("ffprobe returned an invalid frame rate");
+  const [numerator, denominator] = frameRate.split("/").map(Number);
+  const facts = {
     container: "mp4",
-    codec: String(video.codec_name || "unknown"),
-    width: Number(video.width),
-    height: Number(video.height),
+    codec: video.codec_name,
+    width: video.width,
+    height: video.height,
     duration_milliseconds: Math.round(duration * 1000),
-    frame_rate_millihertz: Math.round((denominator ? numerator / denominator : 0) * 1000),
-    audio: parsed.streams?.some((stream) => stream.codec_type === "audio")
-      ? { kind: "present", codec: String(parsed.streams.find((stream) => stream.codec_type === "audio").codec_name || "unknown") }
-      : { kind: "absent" },
+    frame_rate_millihertz: Math.round((numerator / denominator) * 1000),
+    audio: audio ? { kind: "present", codec: audio.codec_name } : { kind: "absent" },
   };
+  if (![facts.width, facts.height, facts.duration_milliseconds, facts.frame_rate_millihertz].every((value) => Number.isSafeInteger(value) && value > 0)) throw new Error("ffprobe media facts must be finite positive integers");
+  return { facts, fullDecode: { tool: "ffprobe", version } };
 }
 
 function dateOnly(value = now()) {
@@ -586,7 +610,7 @@ function operationKeyFromArgument(value) {
 async function importFileUnlocked(operationDir, sourcePath, posterSource, metadata) {
   const statePath = join(operationDir, "state.json");
   const state = await readJson(statePath);
-  if (!["reserved", "submitted", "ambiguous", "downloaded"].includes(state.phase)) throw new Error(`cannot import into ${state.phase} operation`);
+  if (!["reserved", "submitting", "submitted", "ambiguous", "downloaded"].includes(state.phase)) throw new Error(`cannot import into ${state.phase} operation`);
   const source = resolve(sourcePath);
   const sourceInfo = lstatSync(source);
   if (!sourceInfo.isFile() || sourceInfo.isSymbolicLink()) throw new Error("import source must be a regular non-symlink file");
@@ -602,7 +626,6 @@ async function importFileUnlocked(operationDir, sourcePath, posterSource, metada
     file: basename(rawFile),
     content_type: extension === ".webm" ? "video/webm" : "video/mp4",
   };
-  await atomicJson(statePath, sanitizeOperationState(next));
   if (posterSource) {
     const poster = resolve(posterSource);
     const posterInfo = lstatSync(poster);
@@ -610,6 +633,7 @@ async function importFileUnlocked(operationDir, sourcePath, posterSource, metada
     await copyFile(poster, join(operationDir, "poster.webp"));
   }
   await atomicJson(join(operationDir, "admission.json"), metadata || {});
+  await atomicJson(statePath, sanitizeOperationState(next));
   return next;
 }
 
@@ -695,7 +719,9 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
   const operationDir = fileURLToPathIfUrl(operationDirInput);
   const root = fileURLToPathIfUrl(repositoryRoot);
   const release = await acquireLock(operationDir);
+  let releasePublication;
   try {
+    releasePublication = await acquirePublicationLock(root);
     const state = await readJson(join(operationDir, "state.json"));
     if (state.phase === "admitted") {
       try {
@@ -711,118 +737,109 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
       }
     }
     if (state.phase !== "downloaded") throw new Error(`admit requires downloaded state, found ${state.phase}`);
-    const requestRecord = await readJson(join(operationDir, "request.json"));
-    ensureId(requestRecord.case_id, REQUIRED_CASES, "case");
-    ensureId(requestRecord.route_id, REQUIRED_ROUTES, "route");
-    const expectedOperation = operationKey(requestRecord);
-    if (expectedOperation !== state.operation_key) throw new Error("operation key does not match its canonical request");
-    const rawPath = join(operationDir, state.file);
-    const rawInfo = lstatSync(rawPath);
-    if (!rawInfo.isFile() || rawInfo.isSymbolicLink()) throw new Error("downloaded media must be a regular file");
-    const rawBytes = await readFile(rawPath);
-    if (sha256(rawBytes) !== state.raw_sha256) throw new Error("downloaded media hash changed; import it again");
-    if (rawBytes.length >= 25 * 1024 * 1024) throw new Error("media must be strictly smaller than 25 MiB");
-    if (rawBytes.subarray(4, 8).toString("ascii") !== "ftyp") throw new Error("admitted media must be an MP4 file");
-    const posterPathPrivate = join(operationDir, "poster.webp");
-    if (!existsSync(posterPathPrivate)) throw new Error("admit requires poster.webp in the operation directory");
-    const posterBytes = await readFile(posterPathPrivate);
-    if (posterBytes.length >= 25 * 1024 * 1024) throw new Error("poster must be strictly smaller than 25 MiB");
-    if (posterBytes.subarray(0, 4).toString("ascii") !== "RIFF" || posterBytes.subarray(8, 12).toString("ascii") !== "WEBP") throw new Error("poster must be a WebP file");
-    const metadata = existsSync(join(operationDir, "admission.json")) ? await readJson(join(operationDir, "admission.json")) : {};
-    const ffprobeFacts = inspectWithFfprobe(rawPath);
-    const facts = ffprobeFacts || {
-      container: "mp4",
-      codec: metadata.codec || "unverified",
-      width: Number(metadata.width || 1),
-      height: Number(metadata.height || 1),
-      duration_milliseconds: Number(metadata.duration_milliseconds || 5000),
-      frame_rate_millihertz: Number(metadata.frame_rate_millihertz || 24000),
-      audio: metadata.audio === "present" ? { kind: "present", codec: metadata.audio_codec || "unknown" } : { kind: "absent" },
-    };
-    if (facts.width <= 0 || facts.height <= 0 || facts.duration_milliseconds <= 0 || facts.frame_rate_millihertz <= 0) throw new Error("admission media facts must be positive");
-    if (!metadata.reviewed_on || !ISO_INSTANT_PATTERN.test(`${metadata.reviewed_on}T00:00:00.000Z`)) throw new Error("admit requires reviewed_on=YYYY-MM-DD in admission metadata");
-    const providerEvidence = existsSync(join(operationDir, "provider-evidence.json")) ? await readJson(join(operationDir, "provider-evidence.json")) : {};
-    const routeId = requestRecord.route_id;
-    const caseId = requestRecord.case_id;
-    const servedModel = defaultGeneratedEvidence(routeId, providerEvidence);
-    const assetRelative = mediaPath("video", caseId, routeId);
-    const posterRelative = posterPath(caseId, routeId);
-    const receiptRelative = `receipts/${caseId}--${routeId}.json`;
-    const assetAbsolute = join(root, assetRelative);
-    const posterAbsolute = join(root, posterRelative);
-    const receiptAbsolute = join(root, receiptRelative);
-    const releasePublication = await acquirePublicationLock(root);
-    try {
-      const manifestPath = join(root, "data", "comparison.json");
-      const manifest = parseManifest(await readFile(manifestPath, "utf8"));
-      if (requestRecord.prompt_sha256 !== manifest.cases[requestRecord.case_id].prompt.sha256) throw new Error("operation prompt digest does not match the current manifest");
-      if (requestRecord.requested_model !== manifest.routes[requestRecord.route_id].requested_model.id || stableJson(requestRecord.parameters) !== stableJson(manifest.samples[requestRecord.case_id][requestRecord.route_id].parameters)) throw new Error("operation request does not match the current manifest");
-      if (!hasExactServedModel(manifest.routes[routeId], servedModel)) {
-        throw new Error("exact-model admission requires matching route identity evidence");
-      }
-      await mkdir(dirname(assetAbsolute), { recursive: true });
-      await mkdir(dirname(receiptAbsolute), { recursive: true });
-      const assetTemp = `${assetAbsolute}.tmp-${process.pid}`;
-      const posterTemp = `${posterAbsolute}.tmp-${process.pid}`;
-      await writeFile(assetTemp, rawBytes, { mode: 0o644 });
-      await writeFile(posterTemp, posterBytes, { mode: 0o644 });
-      await rename(assetTemp, assetAbsolute);
-      await rename(posterTemp, posterAbsolute);
-      const generated = {
-        kind: "generated",
-        served_model: servedModel,
-        cost: defaultCost(routeId, providerEvidence),
-        generated_at: providerEvidence.completed_at || now(),
-        asset: {
-          sha256: sha256(rawBytes),
-          bytes: rawBytes.length,
-          provenance: metadata.source_sha256
-            ? { kind: "web-derivative", source_sha256: metadata.source_sha256, transform: { tool: metadata.transform_tool || "local-admission", version: metadata.transform_version || "1", arguments: Array.isArray(metadata.transform_arguments) ? metadata.transform_arguments : [] } }
-            : { kind: "direct-provider-output" },
-        },
-        media_facts: {
-          kind: "video",
-          ...facts,
-          poster: { sha256: sha256(posterBytes), bytes: posterBytes.length, width: Number(metadata.poster_width || facts.width), height: Number(metadata.poster_height || facts.height) },
-        },
-        receipt_sha256: "0".repeat(64),
-        alt_text: metadata.alt_text || `${EXPECTED_MODELS[routeId].label} output for the ${manifest.cases[caseId].title.toLowerCase()} prompt.`,
-        admission: {
-          full_decode: { tool: metadata.decode_tool || (ffprobeFacts ? "ffprobe" : "operator-provided decode"), version: metadata.decode_version || "recorded at admission" },
-          nonblank_review: { kind: "human-reviewed", reviewed_on: metadata.reviewed_on },
-        },
-      };
-      const operationForReceipt = { operation_key: state.operation_key, request_sha256: state.request_sha256, created_at: state.created_at || now() };
-      const receipt = {
-        schema_version: 1,
-        operation_key: operationForReceipt.operation_key,
-        request_sha256: operationForReceipt.request_sha256,
-        terminal_status: "succeeded",
-        started_at: operationForReceipt.created_at,
-        completed_at: now(),
-        transport: { status_code: 200, media_content_type: "video/mp4" },
-        served_model: generated.served_model,
-        cost: generated.cost,
-        response_media_sha256: generated.asset.sha256,
-      };
-      const receiptBytes = Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8");
-      generated.receipt_sha256 = sha256(receiptBytes);
-      const receiptTemp = `${receiptAbsolute}.tmp-${process.pid}`;
-      await writeFile(receiptTemp, receiptBytes, { mode: 0o644 });
-      await rename(receiptTemp, receiptAbsolute);
-      manifest.samples[caseId][routeId].state = generated;
-      const manifestTemp = `${manifestPath}.tmp-${process.pid}`;
-      await writeFile(manifestTemp, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o644 });
-      await rename(manifestTemp, manifestPath);
-      await updateHtmlState(caseId, routeId, root);
-      const admitted = { phase: "admitted", operation_key: state.operation_key, request_sha256: state.request_sha256, case_id: caseId, route_id: routeId, public_sha256: generated.asset.sha256 };
-      await atomicJson(join(operationDir, "state.json"), admitted);
-      return { state: admitted, asset: assetRelative, poster: posterRelative, receipt: receiptRelative };
-    } finally {
-      await releasePublication();
-    }
+  const requestRecord = await readJson(join(operationDir, "request.json"));
+  const manifestPath = join(root, "data", "comparison.json");
+  const manifest = parseManifest(await readFile(manifestPath, "utf8"));
+  ensureId(requestRecord.case_id, REQUIRED_CASES, "case");
+  ensureId(requestRecord.route_id, REQUIRED_ROUTES, "route");
+  if (requestRecord.prompt_sha256 !== manifest.cases[requestRecord.case_id].prompt.sha256) throw new Error("operation prompt digest does not match the current manifest");
+  if (requestRecord.requested_model !== manifest.routes[requestRecord.route_id].requested_model.id || stableJson(requestRecord.parameters) !== stableJson(manifest.samples[requestRecord.case_id][requestRecord.route_id].parameters)) throw new Error("operation request does not match the current manifest");
+  const expectedOperation = operationKey(requestRecord);
+  if (expectedOperation !== state.operation_key) throw new Error("operation key does not match its canonical request");
+  const rawPath = join(operationDir, state.file);
+  const rawInfo = lstatSync(rawPath);
+  if (!rawInfo.isFile() || rawInfo.isSymbolicLink()) throw new Error("downloaded media must be a regular file");
+  const rawBytes = await readFile(rawPath);
+  if (sha256(rawBytes) !== state.raw_sha256) throw new Error("downloaded media hash changed; import it again");
+  if (rawBytes.length >= 25 * 1024 * 1024) throw new Error("media must be strictly smaller than 25 MiB");
+  if (rawBytes.subarray(4, 8).toString("ascii") !== "ftyp") throw new Error("admitted media must be an MP4 file");
+  const posterPathPrivate = join(operationDir, "poster.webp");
+  if (!existsSync(posterPathPrivate)) throw new Error("admit requires poster.webp in the operation directory");
+  const posterBytes = await readFile(posterPathPrivate);
+  if (posterBytes.length >= 25 * 1024 * 1024) throw new Error("poster must be strictly smaller than 25 MiB");
+  if (posterBytes.subarray(0, 4).toString("ascii") !== "RIFF" || posterBytes.subarray(8, 12).toString("ascii") !== "WEBP") throw new Error("poster must be a WebP file");
+  const metadata = existsSync(join(operationDir, "admission.json")) ? await readJson(join(operationDir, "admission.json")) : {};
+  const { facts, fullDecode } = inspectWithFfprobe(rawPath);
+  if (!metadata.reviewed_on || !ISO_INSTANT_PATTERN.test(`${metadata.reviewed_on}T00:00:00.000Z`)) throw new Error("admit requires reviewed_on=YYYY-MM-DD in admission metadata");
+  const providerEvidence = existsSync(join(operationDir, "provider-evidence.json")) ? await readJson(join(operationDir, "provider-evidence.json")) : {};
+  const routeId = requestRecord.route_id;
+  const caseId = requestRecord.case_id;
+  const servedModel = defaultGeneratedEvidence(routeId, providerEvidence);
+  if (!hasExactServedModel(manifest.routes[routeId], servedModel)) {
+    throw new Error("exact-model admission requires matching route identity evidence");
+  }
+  const assetRelative = mediaPath("video", caseId, routeId);
+  const posterRelative = posterPath(caseId, routeId);
+  const receiptRelative = `receipts/${caseId}--${routeId}.json`;
+  const assetAbsolute = join(root, assetRelative);
+  const posterAbsolute = join(root, posterRelative);
+  const receiptAbsolute = join(root, receiptRelative);
+  await mkdir(dirname(assetAbsolute), { recursive: true });
+  await mkdir(dirname(receiptAbsolute), { recursive: true });
+  const assetTemp = `${assetAbsolute}.tmp-${process.pid}`;
+  const posterTemp = `${posterAbsolute}.tmp-${process.pid}`;
+  await writeFile(assetTemp, rawBytes, { mode: 0o644 });
+  await writeFile(posterTemp, posterBytes, { mode: 0o644 });
+  await rename(assetTemp, assetAbsolute);
+  await rename(posterTemp, posterAbsolute);
+  const generated = {
+    kind: "generated",
+    served_model: servedModel,
+    cost: defaultCost(routeId, providerEvidence),
+    generated_at: providerEvidence.completed_at || now(),
+    asset: {
+      sha256: sha256(rawBytes),
+      bytes: rawBytes.length,
+      provenance: metadata.source_sha256
+        ? { kind: "web-derivative", source_sha256: metadata.source_sha256, transform: { tool: metadata.transform_tool || "local-admission", version: metadata.transform_version || "1", arguments: Array.isArray(metadata.transform_arguments) ? metadata.transform_arguments : [] } }
+        : { kind: "direct-provider-output" },
+    },
+    media_facts: {
+      kind: "video",
+      ...facts,
+      poster: { sha256: sha256(posterBytes), bytes: posterBytes.length, width: Number(metadata.poster_width || facts.width), height: Number(metadata.poster_height || facts.height) },
+    },
+    receipt_sha256: "0".repeat(64),
+    alt_text: metadata.alt_text || `${EXPECTED_MODELS[routeId].label} output for the ${manifest.cases[caseId].title.toLowerCase()} prompt.`,
+    admission: {
+      full_decode: fullDecode,
+      nonblank_review: { kind: "human-reviewed", reviewed_on: metadata.reviewed_on },
+    },
+  };
+  const operationForReceipt = { operation_key: state.operation_key, request_sha256: state.request_sha256, created_at: state.created_at || now() };
+  const receipt = {
+    schema_version: 1,
+    operation_key: operationForReceipt.operation_key,
+    request_sha256: operationForReceipt.request_sha256,
+    terminal_status: "succeeded",
+    started_at: operationForReceipt.created_at,
+    completed_at: now(),
+    transport: { status_code: 200, media_content_type: "video/mp4" },
+    served_model: generated.served_model,
+    cost: generated.cost,
+    response_media_sha256: generated.asset.provenance.kind === "web-derivative"
+      ? generated.asset.provenance.source_sha256
+      : generated.asset.sha256,
+  };
+  const receiptBytes = Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+  generated.receipt_sha256 = sha256(receiptBytes);
+  const receiptTemp = `${receiptAbsolute}.tmp-${process.pid}`;
+  await writeFile(receiptTemp, receiptBytes, { mode: 0o644 });
+  await rename(receiptTemp, receiptAbsolute);
+  manifest.samples[caseId][routeId].state = generated;
+  const manifestTemp = `${manifestPath}.tmp-${process.pid}`;
+  await writeFile(manifestTemp, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o644 });
+  await rename(manifestTemp, manifestPath);
+    await updateHtmlState(caseId, routeId, root);
+    const admitted = { phase: "admitted", operation_key: state.operation_key, request_sha256: state.request_sha256, case_id: caseId, route_id: routeId, public_sha256: generated.asset.sha256 };
+    await atomicJson(join(operationDir, "state.json"), admitted);
+    return { state: admitted, asset: assetRelative, poster: posterRelative, receipt: receiptRelative };
   } finally {
-    await release();
+    try {
+      if (releasePublication) await releasePublication();
+    } finally {
+      await release();
+    }
   }
 }
 
@@ -894,14 +911,12 @@ async function commandReconcile(args) {
       return;
     }
     if (!args.flags.file) throw new Error("reconcile requires --remote-job-ref or --file");
-    if (state.phase === "ambiguous" || state.phase === "submitting") {
-      await atomicJson(statePath, { ...state, phase: "reserved", reason: undefined });
-    }
+    // Hold the lock and uncertain state until every local import step succeeds.
+    const result = await importFileUnlocked(dir, args.flags.file, args.flags.poster, {});
+    process.stdout.write(`reconciled to ${result.phase}; admit after review\n`);
   } finally {
     await release();
   }
-  const result = await importFile(dir, args.flags.file, args.flags.poster, {});
-  process.stdout.write(`reconciled to ${result.phase}; admit after review\n`);
 }
 
 function printHelp() {

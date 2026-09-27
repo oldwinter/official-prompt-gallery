@@ -72,6 +72,21 @@ node scripts/capture.mjs reserve --case xai-official-01 --route grok-image --dry
 An ambiguous submission is held until `reconcile`; rerunning never silently
 authorizes a second paid request.
 
+### Concurrent admission and crash recovery
+
+Admissions and public-projection recovery hold a gallery-wide
+`.work/publication.lock` while the operation lock is held. Contenders wait up to
+`CAPTURE_PUBLICATION_WAIT_MS` (default 120000) and then report the gallery busy.
+Publication locks never expire automatically: age does not prove that a publisher
+has stopped. Each publisher releases only its unique owner marker and an empty
+lock directory.
+
+After a crashed publisher, stop all capture processes for that gallery before
+removing only `.work/publication.lock` (including a legacy lock file). Preserve
+`.work/operations/` and retry the same `admit` operation; do not submit generation
+again to clear a publication lock. Never remove a lock while a publisher may
+still be running.
+
 ## Provenance and licensing
 
 The prompt cases cite the [OpenAI image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
