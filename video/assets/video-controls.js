@@ -35,7 +35,9 @@ function getRatio(player) {
 function setPlayerRatio(player, ratio) {
   const duration = finiteDuration(player);
   if (!duration) return;
-  player.currentTime = clamp(ratio, 0, 1) * duration;
+  const target = clamp(ratio, 0, 1) * duration;
+  // Native seeking events arrive after syncing resets; avoid feedback writes.
+  if (Math.abs(player.currentTime - target) > 0.001) player.currentTime = target;
 }
 
 /**
