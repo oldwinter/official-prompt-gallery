@@ -189,6 +189,11 @@ function routeHeaders(routeId, operation, json = true) {
   return headers;
 }
 
+function validateRouteConfiguration(routeId, operation) {
+  routeBase(routeId);
+  routeHeaders(routeId, operation);
+}
+
 function responseField(value, keys) {
   for (const key of keys) {
     if (typeof value?.[key] === "string" && value[key].length > 0) return value[key];
@@ -447,6 +452,7 @@ async function submitAndDownload(request, reservation) {
     if (state.phase === "admitted" || state.phase === "downloaded") return state;
     if (state.phase === "ambiguous" || state.phase === "submitting") throw new Error("operation submission is ambiguous; reconcile it before running again");
     const adapter = adapterFor(request.route_id);
+    if (state.phase === "reserved") validateRouteConfiguration(request.route_id, key);
     let result;
     let remoteJobRef = state.remote_job_ref;
     try {

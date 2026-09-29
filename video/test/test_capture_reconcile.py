@@ -268,6 +268,17 @@ class CaptureReconcileTests(unittest.TestCase):
                 self.assertNotIn("MOCK_FETCH POST", rerun.stderr)
                 self.assertEqual(json.loads(self.state_path.read_text(encoding="utf-8")), state)
 
+    def test_missing_credentials_leave_reserved_state_retryable(self) -> None:
+        before = self.state_path.read_bytes()
+        key = self.env.pop("GROK_API_KEY")
+        try:
+            result = self.rerun()
+        finally:
+            self.env["GROK_API_KEY"] = key
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("GROK_API_KEY is required", result.stderr)
+        self.assertEqual(self.state_path.read_bytes(), before)
+
     def test_concurrent_run_is_locked_during_import(self) -> None:
         for phase in ("ambiguous", "submitting"):
             with self.subTest(phase=phase):
