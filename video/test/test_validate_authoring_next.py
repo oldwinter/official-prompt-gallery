@@ -24,6 +24,18 @@ def run_validate(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 class ValidateAuthoringNextTests(unittest.TestCase):
+    def test_unknown_or_incomplete_arguments_fail(self) -> None:
+        for args in (("--bogus",), ("--mode",)):
+            with self.subTest(args=args):
+                result = run_validate(*args)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("validation error:", result.stderr)
+
+    def test_help_lists_supported_mode(self) -> None:
+        result = run_validate("--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--mode authoring|publish", result.stdout)
+
     def test_publish_failure_names_authoring(self) -> None:
         result = run_validate()
         self.assertEqual(result.returncode, 1)
