@@ -584,12 +584,15 @@ function dateOnly(value = now()) {
 
 function parseFlagArgs(argv) {
   const result = { positional: [], flags: {} };
+  const allowed = new Set(["case", "route", "dry-run", "operation", "file", "poster", "remote-job-ref", "reviewed-on", "width", "height", "duration-milliseconds", "frame-rate-millihertz", "codec", "audio", "audio-codec", "poster-width", "poster-height", "alt-text", "source-sha256", "transform-tool", "transform-version", "decode-tool", "decode-version"]);
   for (let index = 0; index < argv.length; index += 1) {
     const item = argv[index];
     if (!item.startsWith("--")) {
       result.positional.push(item);
       continue;
     }
+    const name = item.slice(2).split("=", 1)[0];
+    if (!allowed.has(name)) throw new Error(`unknown argument: --${name}`);
     const equal = item.indexOf("=");
     if (equal > 2) {
       result.flags[item.slice(2, equal)] = item.slice(equal + 1);
@@ -956,9 +959,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     await main(process.argv.slice(2));
   } catch (error) {
     process.stderr.write(`capture: ${error.message}\n`);
-    if (error.message.startsWith("usage:")) {
-      process.stderr.write("next: node scripts/capture.mjs --help\n");
-    }
+    process.stderr.write("next: node scripts/capture.mjs --help\n");
     process.exitCode = 1;
   }
 }
