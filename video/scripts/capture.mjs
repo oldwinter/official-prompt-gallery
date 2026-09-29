@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { copyFile, mkdir, readFile, rename, rm, rmdir, unlink, writeFile } from "node:fs/promises";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
-import { join, resolve, dirname, basename } from "node:path";
+import { join, resolve, relative, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import {
@@ -61,6 +61,11 @@ function operationDirectory(operationKey, privateRoot = PRIVATE_ROOT) {
 
 function fileURLToPathIfUrl(value) {
   return value instanceof URL ? fileURLToPath(value) : String(value);
+}
+
+function assertInside(root, candidate, label) {
+  const pathFromRoot = relative(root, candidate);
+  if (pathFromRoot.startsWith("..") || resolve(pathFromRoot) === pathFromRoot) throw new Error(`${label} must remain inside the operation directory`);
 }
 
 function readManifest() {
@@ -759,7 +764,8 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
   if (requestRecord.requested_model !== manifest.routes[requestRecord.route_id].requested_model.id || stableJson(requestRecord.parameters) !== stableJson(manifest.samples[requestRecord.case_id][requestRecord.route_id].parameters)) throw new Error("operation request does not match the current manifest");
   const expectedOperation = operationKey(requestRecord);
   if (expectedOperation !== state.operation_key) throw new Error("operation key does not match its canonical request");
-  const rawPath = join(operationDir, state.file);
+  const rawPath = resolve(operationDir, state.file);
+  assertInside(operationDir, rawPath, "downloaded media");
   const rawInfo = lstatSync(rawPath);
   if (!rawInfo.isFile() || rawInfo.isSymbolicLink()) throw new Error("downloaded media must be a regular file");
   const rawBytes = await readFile(rawPath);
