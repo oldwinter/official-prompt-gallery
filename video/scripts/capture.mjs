@@ -616,17 +616,17 @@ async function importFileUnlocked(operationDir, sourcePath, posterSource, metada
   const sourceInfo = lstatSync(source);
   if (!sourceInfo.isFile() || sourceInfo.isSymbolicLink()) throw new Error("import source must be a regular non-symlink file");
   if (sourceInfo.size >= MAX_PUBLIC_BYTES) throw new Error("imported media must be strictly smaller than 25 MiB");
-  const extension = source.toLowerCase().endsWith(".webm") ? ".webm" : ".mp4";
-  const rawFile = join(operationDir, `raw${extension}`);
-  await copyFile(source, rawFile);
-  const bytes = await readFile(rawFile);
+  const bytes = await readFile(source);
+  if (bytes.subarray(4, 8).toString("ascii") !== "ftyp") throw new Error("imported media must be an MP4 file");
+  const rawFile = join(operationDir, "raw.mp4");
+  await writeFile(rawFile, bytes, { mode: 0o600 });
   const next = {
     phase: "downloaded",
     operation_key: state.operation_key,
     request_sha256: state.request_sha256,
     raw_sha256: sha256(bytes),
     file: basename(rawFile),
-    content_type: extension === ".webm" ? "video/webm" : "video/mp4",
+    content_type: "video/mp4",
   };
   if (posterSource) {
     const poster = resolve(posterSource);
@@ -926,7 +926,7 @@ function printHelp() {
     [
       "usage: node scripts/capture.mjs <reserve|run|import|admit|reconcile> [options]",
       "  reserve/run: --case CASE --route ROUTE [--dry-run]",
-      "  import: --operation .work/operations/KEY --file PRIVATE_VIDEO [--poster POSTER]",
+      "  import: --operation .work/operations/KEY --file PRIVATE_MP4 [--poster POSTER]",
       "  admit: --operation .work/operations/KEY",
       "  reconcile: --operation .work/operations/KEY (--file PRIVATE_VIDEO | --remote-job-ref REF)",
       "",

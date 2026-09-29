@@ -194,6 +194,14 @@ class CaptureReconcileTests(unittest.TestCase):
                 self.seed(phase)
                 self.assert_held(self.reconcile("--file", str(oversized)), "strictly smaller than 25 MiB")
 
+    def test_webm_source_preserves_uncertain_state(self) -> None:
+        webm = self.gallery / "input.webm"
+        webm.write_bytes(b"\x1aE\xdf\xa3webm-fixture")
+        for phase in ("ambiguous", "submitting"):
+            with self.subTest(phase=phase):
+                self.seed(phase)
+                self.assert_held(self.reconcile("--file", str(webm)), "MP4")
+
     def test_poster_failure_preserves_uncertain_state_and_blocks_submit(self) -> None:
         directory = self.gallery / "directory.webp"
         directory.mkdir()
