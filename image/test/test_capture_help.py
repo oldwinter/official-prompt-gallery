@@ -43,6 +43,14 @@ class CaptureHelpTests(unittest.TestCase):
                 combined = f"{result.stdout}\n{result.stderr}"
                 self.assertIn("See: node scripts/capture.mjs --help", combined)
 
+    def test_duplicate_case_flag_is_rejected(self) -> None:
+        result = run_capture(
+            "reserve", "--case", "wrong", "--case", "openai-official-01",
+            "--route", "grok-image", "--dry-run",
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("duplicate argument: --case", result.stderr)
+
     def test_readme_names_help(self) -> None:
         readme = README.read_text(encoding="utf-8")
         capture = readme.split("## Private capture flow", 1)[1].split("## Provenance and licensing", 1)[0]

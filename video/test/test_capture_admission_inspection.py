@@ -127,6 +127,24 @@ class CaptureAdmissionInspectionTests(unittest.TestCase):
     def test_missing_ffprobe_rejects_signature_only_media(self) -> None:
         self.assert_rejected("ffprobe")
 
+    def test_downloaded_path_cannot_escape_operation_directory(self) -> None:
+        outside = self.gallery / ".work" / "outside.mp4"
+        shutil.copyfile(self.gallery / "input.mp4", outside)
+        state = json.loads((self.operation / "state.json").read_text())
+        state["file"] = "../../outside.mp4"
+        state["raw_sha256"] = hashlib.sha256(outside.read_bytes()).hexdigest()
+        (self.operation / "state.json").write_text(json.dumps(state), encoding="utf-8")
+        self.state_before = (self.operation / "state.json").read_bytes()
+        self.install_probe()
+        self.assert_rejected("inside the operation directory")
+
+    def test_invalid_calendar_review_date_rejects_before_public_writes(self) -> None:
+        metadata = json.loads((self.operation / "admission.json").read_text())
+        metadata["reviewed_on"] = "2026-02-31"
+        (self.operation / "admission.json").write_text(json.dumps(metadata), encoding="utf-8")
+        self.install_probe()
+        self.assert_rejected("calendar date")
+
     def test_metadata_cannot_replace_missing_inspection(self) -> None:
         self.import_media(
             "--width", "1280", "--height", "720",

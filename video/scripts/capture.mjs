@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { copyFile, mkdir, readFile, rename, rm, rmdir, unlink, writeFile } from "node:fs/promises";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
-import { join, resolve, dirname, basename } from "node:path";
+import { join, resolve, relative, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import {
@@ -19,13 +19,21 @@ const PRIVATE_ROOT = join(REPOSITORY_ROOT, ".work");
 const OPERATIONS_ROOT = join(PRIVATE_ROOT, "operations");
 const H3_DEFAULT_BASE = "http://127.0.0.1:30010";
 const OPERATION_HASH_PATTERN = /^[a-f0-9]{64}$/;
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
+const MAX_PUBLIC_BYTES = 25 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 120_000;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
 function now() {
   return new Date().toISOString().replace(/(\.\d{3})\d+Z$/, "$1Z");
+}
+
+function isCalendarDate(value) {
+  if (typeof value !== "string" || !ISO_DATE_PATTERN.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function sha256(value) {
@@ -60,6 +68,11 @@ function operationDirectory(operationKey, privateRoot = PRIVATE_ROOT) {
 
 function fileURLToPathIfUrl(value) {
   return value instanceof URL ? fileURLToPath(value) : String(value);
+}
+
+function assertInside(root, candidate, label) {
+  const pathFromRoot = relative(root, candidate);
+  if (pathFromRoot.startsWith("..") || resolve(pathFromRoot) === pathFromRoot) throw new Error(`${label} must remain inside the operation directory`);
 }
 
 function readManifest() {
@@ -188,6 +201,11 @@ function routeHeaders(routeId, operation, json = true) {
   return headers;
 }
 
+function validateRouteConfiguration(routeId, operation) {
+  routeBase(routeId);
+  routeHeaders(routeId, operation);
+}
+
 function responseField(value, keys) {
   for (const key of keys) {
     if (typeof value?.[key] === "string" && value[key].length > 0) return value[key];
@@ -224,6 +242,7 @@ export function parseProviderResponse(route, response) {
   const pending = ["", "queued", "pending", "processing", "in_progress", "running"].includes(status);
   if (failed) throw new Error("provider reported a terminal failure");
   if (!terminal && !pending) throw new Error(`provider reported an unknown status: ${status}`);
+  if (terminal && !mediaUrl && !remoteJobRef) throw new Error("provider completion omitted a media URL or job reference");
   if (!remoteJobRef && !mediaUrl && !terminal) throw new Error("provider response omitted a job reference");
   return {
     phase: terminal ? "completed" : "pending",
@@ -445,6 +464,7 @@ async function submitAndDownload(request, reservation) {
     if (state.phase === "admitted" || state.phase === "downloaded") return state;
     if (state.phase === "ambiguous" || state.phase === "submitting") throw new Error("operation submission is ambiguous; reconcile it before running again");
     const adapter = adapterFor(request.route_id);
+    if (state.phase === "reserved") validateRouteConfiguration(request.route_id, key);
     let result;
     let remoteJobRef = state.remote_job_ref;
     try {
@@ -583,12 +603,16 @@ function dateOnly(value = now()) {
 
 function parseFlagArgs(argv) {
   const result = { positional: [], flags: {} };
+  const allowed = new Set(["case", "route", "dry-run", "operation", "file", "poster", "remote-job-ref", "reviewed-on", "width", "height", "duration-milliseconds", "frame-rate-millihertz", "codec", "audio", "audio-codec", "poster-width", "poster-height", "alt-text", "source-sha256", "transform-tool", "transform-version", "decode-tool", "decode-version"]);
   for (let index = 0; index < argv.length; index += 1) {
     const item = argv[index];
     if (!item.startsWith("--")) {
       result.positional.push(item);
       continue;
     }
+    const name = item.slice(2).split("=", 1)[0];
+    if (!allowed.has(name)) throw new Error(`unknown argument: --${name}`);
+    if (Object.prototype.hasOwnProperty.call(result.flags, name)) throw new Error(`duplicate argument: --${name}`);
     const equal = item.indexOf("=");
     if (equal > 2) {
       result.flags[item.slice(2, equal)] = item.slice(equal + 1);
@@ -614,17 +638,18 @@ async function importFileUnlocked(operationDir, sourcePath, posterSource, metada
   const source = resolve(sourcePath);
   const sourceInfo = lstatSync(source);
   if (!sourceInfo.isFile() || sourceInfo.isSymbolicLink()) throw new Error("import source must be a regular non-symlink file");
-  const extension = source.toLowerCase().endsWith(".webm") ? ".webm" : ".mp4";
-  const rawFile = join(operationDir, `raw${extension}`);
-  await copyFile(source, rawFile);
-  const bytes = await readFile(rawFile);
+  if (sourceInfo.size >= MAX_PUBLIC_BYTES) throw new Error("imported media must be strictly smaller than 25 MiB");
+  const bytes = await readFile(source);
+  if (bytes.subarray(4, 8).toString("ascii") !== "ftyp") throw new Error("imported media must be an MP4 file");
+  const rawFile = join(operationDir, "raw.mp4");
+  await writeFile(rawFile, bytes, { mode: 0o600 });
   const next = {
     phase: "downloaded",
     operation_key: state.operation_key,
     request_sha256: state.request_sha256,
     raw_sha256: sha256(bytes),
     file: basename(rawFile),
-    content_type: extension === ".webm" ? "video/webm" : "video/mp4",
+    content_type: "video/mp4",
   };
   if (posterSource) {
     const poster = resolve(posterSource);
@@ -746,7 +771,8 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
   if (requestRecord.requested_model !== manifest.routes[requestRecord.route_id].requested_model.id || stableJson(requestRecord.parameters) !== stableJson(manifest.samples[requestRecord.case_id][requestRecord.route_id].parameters)) throw new Error("operation request does not match the current manifest");
   const expectedOperation = operationKey(requestRecord);
   if (expectedOperation !== state.operation_key) throw new Error("operation key does not match its canonical request");
-  const rawPath = join(operationDir, state.file);
+  const rawPath = resolve(operationDir, state.file);
+  assertInside(operationDir, rawPath, "downloaded media");
   const rawInfo = lstatSync(rawPath);
   if (!rawInfo.isFile() || rawInfo.isSymbolicLink()) throw new Error("downloaded media must be a regular file");
   const rawBytes = await readFile(rawPath);
@@ -760,7 +786,7 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
   if (posterBytes.subarray(0, 4).toString("ascii") !== "RIFF" || posterBytes.subarray(8, 12).toString("ascii") !== "WEBP") throw new Error("poster must be a WebP file");
   const metadata = existsSync(join(operationDir, "admission.json")) ? await readJson(join(operationDir, "admission.json")) : {};
   const { facts, fullDecode } = inspectWithFfprobe(rawPath);
-  if (!metadata.reviewed_on || !ISO_INSTANT_PATTERN.test(`${metadata.reviewed_on}T00:00:00.000Z`)) throw new Error("admit requires reviewed_on=YYYY-MM-DD in admission metadata");
+  if (!isCalendarDate(metadata.reviewed_on)) throw new Error("admit requires reviewed_on to be a valid YYYY-MM-DD calendar date");
   const providerEvidence = existsSync(join(operationDir, "provider-evidence.json")) ? await readJson(join(operationDir, "provider-evidence.json")) : {};
   const routeId = requestRecord.route_id;
   const caseId = requestRecord.case_id;
@@ -924,7 +950,7 @@ function printHelp() {
     [
       "usage: node scripts/capture.mjs <reserve|run|import|admit|reconcile> [options]",
       "  reserve/run: --case CASE --route ROUTE [--dry-run]",
-      "  import: --operation .work/operations/KEY --file PRIVATE_VIDEO [--poster POSTER]",
+      "  import: --operation .work/operations/KEY --file PRIVATE_MP4 [--poster POSTER]",
       "  admit: --operation .work/operations/KEY",
       "  reconcile: --operation .work/operations/KEY (--file PRIVATE_VIDEO | --remote-job-ref REF)",
       "",
@@ -954,9 +980,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     await main(process.argv.slice(2));
   } catch (error) {
     process.stderr.write(`capture: ${error.message}\n`);
-    if (error.message.startsWith("usage:")) {
-      process.stderr.write("next: node scripts/capture.mjs --help\n");
-    }
+    process.stderr.write("next: node scripts/capture.mjs --help\n");
     process.exitCode = 1;
   }
 }

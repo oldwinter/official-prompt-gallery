@@ -178,6 +178,14 @@ class CaptureReconcileTests(unittest.TestCase):
                     self.source.write_bytes(contents)
                     self.assert_held(self.reconcile("--file", str(self.source)), error)
 
+    def test_symlink_source_preserves_uncertain_state_and_blocks_submit(self) -> None:
+        symlink = self.gallery / "linked.webp"
+        symlink.symlink_to(self.source)
+        for phase in ("ambiguous", "submitting"):
+            with self.subTest(phase=phase):
+                self.seed(phase)
+                self.assert_held(self.reconcile("--file", str(symlink)), "regular non-symlink file")
+
     def test_successful_import_commits_downloaded_and_blocks_submit(self) -> None:
         for phase in ("ambiguous", "submitting"):
             with self.subTest(phase=phase):

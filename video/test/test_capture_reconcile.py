@@ -184,6 +184,24 @@ class CaptureReconcileTests(unittest.TestCase):
                     result = self.reconcile("--file", str(invalid))
                     self.assert_held(result, "regular non-symlink file")
 
+    def test_oversized_source_preserves_uncertain_state(self) -> None:
+        oversized = self.gallery / "oversized.mp4"
+        with oversized.open("wb") as stream:
+            stream.write(b"\x00\x00\x00\x0cftypisom")
+            stream.truncate(25 * 1024 * 1024 + 1)
+        for phase in ("ambiguous", "submitting"):
+            with self.subTest(phase=phase):
+                self.seed(phase)
+                self.assert_held(self.reconcile("--file", str(oversized)), "strictly smaller than 25 MiB")
+
+    def test_webm_source_preserves_uncertain_state(self) -> None:
+        webm = self.gallery / "input.webm"
+        webm.write_bytes(b"\x1aE\xdf\xa3webm-fixture")
+        for phase in ("ambiguous", "submitting"):
+            with self.subTest(phase=phase):
+                self.seed(phase)
+                self.assert_held(self.reconcile("--file", str(webm)), "MP4")
+
     def test_poster_failure_preserves_uncertain_state_and_blocks_submit(self) -> None:
         directory = self.gallery / "directory.webp"
         directory.mkdir()
@@ -249,6 +267,17 @@ class CaptureReconcileTests(unittest.TestCase):
                 self.assertIn("MOCK_FETCH GET https://capture.invalid/v1/videos/recovered-job", rerun.stderr)
                 self.assertNotIn("MOCK_FETCH POST", rerun.stderr)
                 self.assertEqual(json.loads(self.state_path.read_text(encoding="utf-8")), state)
+
+    def test_missing_credentials_leave_reserved_state_retryable(self) -> None:
+        before = self.state_path.read_bytes()
+        key = self.env.pop("GROK_API_KEY")
+        try:
+            result = self.rerun()
+        finally:
+            self.env["GROK_API_KEY"] = key
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("GROK_API_KEY is required", result.stderr)
+        self.assertEqual(self.state_path.read_bytes(), before)
 
     def test_concurrent_run_is_locked_during_import(self) -> None:
         for phase in ("ambiguous", "submitting"):

@@ -43,6 +43,23 @@ class CaptureHelpTests(unittest.TestCase):
                 combined = f"{result.stdout}\n{result.stderr}"
                 self.assertIn("next: node scripts/capture.mjs --help", combined)
 
+    def test_unknown_flags_are_rejected(self) -> None:
+        result = run_capture(
+            "reserve", "--case", "minimax-official-01", "--route", "grok-video",
+            "--dry-run", "--bogus",
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("unknown argument: --bogus", result.stderr)
+        self.assertIn("next: node scripts/capture.mjs --help", result.stderr)
+
+    def test_duplicate_case_flag_is_rejected(self) -> None:
+        result = run_capture(
+            "reserve", "--case", "wrong", "--case", "minimax-official-01",
+            "--route", "grok-video", "--dry-run",
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("duplicate argument: --case", result.stderr)
+
     def test_readme_names_help(self) -> None:
         readme = README.read_text(encoding="utf-8")
         capture = readme.split("## Private capture flow", 1)[1].split("## Model and rights boundary", 1)[0]

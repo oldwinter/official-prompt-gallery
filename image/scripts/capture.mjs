@@ -561,6 +561,8 @@ async function importOperationUnlocked(operationPath, sourceFile) {
   const state = await readJson(statePath(directory));
   if (!['reserved', 'submitting', 'submitted', 'ambiguous', 'downloaded'].includes(state.phase)) throw new Error(`cannot import into ${state.phase} operation`);
   const source = path.resolve(sourceFile);
+  const sourceInfo = await fs.lstat(source);
+  if (!sourceInfo.isFile() || sourceInfo.isSymbolicLink()) throw new Error('import source must be a regular non-symlink file');
   const sourceBytes = await fs.readFile(source);
   if (!sourceBytes.length || sourceBytes.length >= MAX_BYTES) throw new Error('imported image is empty or exceeds 25 MiB');
   const header = inspectImageHeader(sourceBytes);
@@ -916,8 +918,13 @@ async function reconcileOperation(operationPath, options) {
 function parseArgs(argv) {
   const [command = ''] = argv;
   const options = { command };
+  const seen = new Set();
   for (let index = 1; index < argv.length; index += 1) {
     const argument = argv[index];
+    if (argument.startsWith('--')) {
+      if (seen.has(argument)) throw new Error(`duplicate argument: ${argument}`);
+      seen.add(argument);
+    }
     if (argument === '--case') options.caseId = argv[++index];
     else if (argument === '--route') options.routeId = argv[++index];
     else if (argument === '--operation') options.operation = argv[++index];

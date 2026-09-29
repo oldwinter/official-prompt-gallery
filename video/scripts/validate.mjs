@@ -767,19 +767,36 @@ export async function validateRepository(root = fileURLToPath(new URL("../", imp
 }
 
 function parseMode(argv) {
-  const index = argv.indexOf("--mode");
-  if (index === -1) return "publish";
-  return argv[index + 1] || "";
+  let mode = "publish";
+  let help = false;
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index];
+    if (argument === "--mode") {
+      const value = argv[++index];
+      if (!value || value.startsWith("--")) throw new Error("--mode requires authoring or publish");
+      mode = value;
+    } else if (argument === "--help" || argument === "-h") help = true;
+    else throw new Error(`unknown argument: ${argument}`);
+  }
+  return { mode, help };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const mode = parseMode(process.argv.slice(2));
-  const report = await validateRepository(fileURLToPath(new URL("../", import.meta.url)), mode === "fixture" ? "authoring" : mode);
-  if (mode === "fixture") process.stdout.write("fixture mode: structural authoring checks\n");
-  for (const finding of report.findings) process.stdout.write(`${finding.code} ${finding.path}: ${finding.message}\n`);
-  process.stdout.write(`${report.ok ? "PASS" : "FAIL"} mode=${mode} planned=${report.planned} generated=${report.generated}${report.ffprobe_checked ? " ffprobe=checked" : ""}\n`);
-  if (!report.ok && mode === "publish" && report.planned > 0) {
-    process.stdout.write("next: this checkout still has planned cells; run `node scripts/validate.mjs --mode authoring`\n");
+  try {
+    const options = parseMode(process.argv.slice(2));
+    if (options.help) {
+      process.stdout.write("Usage: node scripts/validate.mjs [--mode authoring|publish]\n");
+    } else {
+      const mode = options.mode;
+      const report = await validateRepository(fileURLToPath(new URL("../", import.meta.url)), mode === "fixture" ? "authoring" : mode);
+      if (mode === "fixture") process.stdout.write("fixture mode: structural authoring checks\n");
+      for (const finding of report.findings) process.stdout.write(`${finding.code} ${finding.path}: ${finding.message}\n`);
+      process.stdout.write(`${report.ok ? "PASS" : "FAIL"} mode=${mode} planned=${report.planned} generated=${report.generated}${report.ffprobe_checked ? " ffprobe=checked" : ""}\n`);
+      if (!report.ok && mode === "publish" && report.planned > 0) process.stdout.write("next: this checkout still has planned cells; run `node scripts/validate.mjs --mode authoring`\n");
+      process.exitCode = report.ok ? 0 : 1;
+    }
+  } catch (error) {
+    process.stderr.write(`validation error: ${error.message}\n`);
+    process.exitCode = 1;
   }
-  process.exitCode = report.ok ? 0 : 1;
 }
