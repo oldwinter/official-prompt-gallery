@@ -19,6 +19,7 @@ const PRIVATE_ROOT = join(REPOSITORY_ROOT, ".work");
 const OPERATIONS_ROOT = join(PRIVATE_ROOT, "operations");
 const H3_DEFAULT_BASE = "http://127.0.0.1:30010";
 const OPERATION_HASH_PATTERN = /^[a-f0-9]{64}$/;
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
 const MAX_PUBLIC_BYTES = 25 * 1024 * 1024;
@@ -27,6 +28,12 @@ const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
 function now() {
   return new Date().toISOString().replace(/(\.\d{3})\d+Z$/, "$1Z");
+}
+
+function isCalendarDate(value) {
+  if (typeof value !== "string" || !ISO_DATE_PATTERN.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function sha256(value) {
@@ -779,7 +786,7 @@ export async function admitOperation(operationDirInput, repositoryRoot = REPOSIT
   if (posterBytes.subarray(0, 4).toString("ascii") !== "RIFF" || posterBytes.subarray(8, 12).toString("ascii") !== "WEBP") throw new Error("poster must be a WebP file");
   const metadata = existsSync(join(operationDir, "admission.json")) ? await readJson(join(operationDir, "admission.json")) : {};
   const { facts, fullDecode } = inspectWithFfprobe(rawPath);
-  if (!metadata.reviewed_on || !ISO_INSTANT_PATTERN.test(`${metadata.reviewed_on}T00:00:00.000Z`)) throw new Error("admit requires reviewed_on=YYYY-MM-DD in admission metadata");
+  if (!isCalendarDate(metadata.reviewed_on)) throw new Error("admit requires reviewed_on to be a valid YYYY-MM-DD calendar date");
   const providerEvidence = existsSync(join(operationDir, "provider-evidence.json")) ? await readJson(join(operationDir, "provider-evidence.json")) : {};
   const routeId = requestRecord.route_id;
   const caseId = requestRecord.case_id;

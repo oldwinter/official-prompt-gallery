@@ -138,6 +138,13 @@ class CaptureAdmissionInspectionTests(unittest.TestCase):
         self.install_probe()
         self.assert_rejected("inside the operation directory")
 
+    def test_invalid_calendar_review_date_rejects_before_public_writes(self) -> None:
+        metadata = json.loads((self.operation / "admission.json").read_text())
+        metadata["reviewed_on"] = "2026-02-31"
+        (self.operation / "admission.json").write_text(json.dumps(metadata), encoding="utf-8")
+        self.install_probe()
+        self.assert_rejected("calendar date")
+
     def test_metadata_cannot_replace_missing_inspection(self) -> None:
         self.import_media(
             "--width", "1280", "--height", "720",
