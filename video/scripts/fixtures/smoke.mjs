@@ -20,6 +20,7 @@ const h3Form = h3FormData({ ...request, requested_model: 'MiniMax-H3', parameter
 assert.equal(h3Form.get('model'), '/models/MiniMax-H3');
 assert.equal(JSON.parse(h3Form.get('extra_body')).task, 't2va');
 assert.equal(parseProviderResponse('grok-video', { status: 'pending', request_id: 'job-1' }).phase, 'pending');
+assert.throws(() => parseProviderResponse('grok-video', { status: 'completed' }), /media URL or job reference/);
 assert.throws(() => parseProviderResponse('grok-video', { status: 'expired', request_id: 'job-1' }), /terminal failure/);
 assert.throws(() => parseProviderResponse('grok-video', { status: 'unknown', request_id: 'job-1' }), /unknown status/);
 assert.equal(hasExactServedModel(manifest.routes['grok-video'], { kind: 'not-exposed', reason: 'provider-response-omits-model' }), false);

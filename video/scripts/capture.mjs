@@ -225,6 +225,7 @@ export function parseProviderResponse(route, response) {
   const pending = ["", "queued", "pending", "processing", "in_progress", "running"].includes(status);
   if (failed) throw new Error("provider reported a terminal failure");
   if (!terminal && !pending) throw new Error(`provider reported an unknown status: ${status}`);
+  if (terminal && !mediaUrl && !remoteJobRef) throw new Error("provider completion omitted a media URL or job reference");
   if (!remoteJobRef && !mediaUrl && !terminal) throw new Error("provider response omitted a job reference");
   return {
     phase: terminal ? "completed" : "pending",
