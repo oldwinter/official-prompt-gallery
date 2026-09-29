@@ -593,6 +593,7 @@ function parseFlagArgs(argv) {
     }
     const name = item.slice(2).split("=", 1)[0];
     if (!allowed.has(name)) throw new Error(`unknown argument: --${name}`);
+    if (Object.prototype.hasOwnProperty.call(result.flags, name)) throw new Error(`duplicate argument: --${name}`);
     const equal = item.indexOf("=");
     if (equal > 2) {
       result.flags[item.slice(2, equal)] = item.slice(equal + 1);

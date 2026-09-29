@@ -918,8 +918,13 @@ async function reconcileOperation(operationPath, options) {
 function parseArgs(argv) {
   const [command = ''] = argv;
   const options = { command };
+  const seen = new Set();
   for (let index = 1; index < argv.length; index += 1) {
     const argument = argv[index];
+    if (argument.startsWith('--')) {
+      if (seen.has(argument)) throw new Error(`duplicate argument: ${argument}`);
+      seen.add(argument);
+    }
     if (argument === '--case') options.caseId = argv[++index];
     else if (argument === '--route') options.routeId = argv[++index];
     else if (argument === '--operation') options.operation = argv[++index];
