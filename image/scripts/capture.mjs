@@ -561,6 +561,8 @@ async function importOperationUnlocked(operationPath, sourceFile) {
   const state = await readJson(statePath(directory));
   if (!['reserved', 'submitting', 'submitted', 'ambiguous', 'downloaded'].includes(state.phase)) throw new Error(`cannot import into ${state.phase} operation`);
   const source = path.resolve(sourceFile);
+  const sourceInfo = await fs.lstat(source);
+  if (!sourceInfo.isFile() || sourceInfo.isSymbolicLink()) throw new Error('import source must be a regular non-symlink file');
   const sourceBytes = await fs.readFile(source);
   if (!sourceBytes.length || sourceBytes.length >= MAX_BYTES) throw new Error('imported image is empty or exceeds 25 MiB');
   const header = inspectImageHeader(sourceBytes);
