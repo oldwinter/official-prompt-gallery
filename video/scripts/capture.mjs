@@ -21,6 +21,7 @@ const H3_DEFAULT_BASE = "http://127.0.0.1:30010";
 const OPERATION_HASH_PATTERN = /^[a-f0-9]{64}$/;
 const ISO_INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
+const MAX_PUBLIC_BYTES = 25 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 120_000;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
@@ -614,6 +615,7 @@ async function importFileUnlocked(operationDir, sourcePath, posterSource, metada
   const source = resolve(sourcePath);
   const sourceInfo = lstatSync(source);
   if (!sourceInfo.isFile() || sourceInfo.isSymbolicLink()) throw new Error("import source must be a regular non-symlink file");
+  if (sourceInfo.size >= MAX_PUBLIC_BYTES) throw new Error("imported media must be strictly smaller than 25 MiB");
   const extension = source.toLowerCase().endsWith(".webm") ? ".webm" : ".mp4";
   const rawFile = join(operationDir, `raw${extension}`);
   await copyFile(source, rawFile);

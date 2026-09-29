@@ -184,6 +184,16 @@ class CaptureReconcileTests(unittest.TestCase):
                     result = self.reconcile("--file", str(invalid))
                     self.assert_held(result, "regular non-symlink file")
 
+    def test_oversized_source_preserves_uncertain_state(self) -> None:
+        oversized = self.gallery / "oversized.mp4"
+        with oversized.open("wb") as stream:
+            stream.write(b"\x00\x00\x00\x0cftypisom")
+            stream.truncate(25 * 1024 * 1024 + 1)
+        for phase in ("ambiguous", "submitting"):
+            with self.subTest(phase=phase):
+                self.seed(phase)
+                self.assert_held(self.reconcile("--file", str(oversized)), "strictly smaller than 25 MiB")
+
     def test_poster_failure_preserves_uncertain_state_and_blocks_submit(self) -> None:
         directory = self.gallery / "directory.webp"
         directory.mkdir()
